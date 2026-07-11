@@ -1,27 +1,18 @@
-// KI-Unterstützung (Phase 4) über die Claude API:
+// KI-Unterstützung (Phase 4):
 //   - Antwortentwürfe aus Ticketverlauf + passenden Wissensdatenbank-Artikeln
 //   - Zusammenfassung langer Ticketverläufe (als interne Notiz)
 //   - Auto-Klassifizierung neuer Tickets (Kategorie, Priorität, Stimmung)
 //
-// Aktivierung: ANTHROPIC_API_KEY setzen. Modell über AI_MODEL steuerbar
-// (Standard: claude-opus-4-8). Auto-Klassifizierung per AI_AUTO_CLASSIFY=false
+// Aktivierung und Provider-Wahl (Claude API oder OpenAI-kompatible API):
+// siehe ai-provider.ts. Auto-Klassifizierung per AI_AUTO_CLASSIFY=false
 // abschaltbar.
-import Anthropic from "@anthropic-ai/sdk";
-import { zodOutputFormat } from "@anthropic-ai/sdk/helpers/zod";
 import * as z from "zod/v4";
 import { db } from "@/lib/db";
+import { aiComplete, aiCompleteStructured, isAiEnabled } from "./ai-provider";
 
-export const isAiEnabled = () => !!process.env.ANTHROPIC_API_KEY;
+export { isAiEnabled };
 export const isAutoClassifyEnabled = () =>
   isAiEnabled() && process.env.AI_AUTO_CLASSIFY !== "false";
-
-const MODEL = () => process.env.AI_MODEL ?? "claude-opus-4-8";
-
-let clientInstance: Anthropic | null = null;
-function client(): Anthropic {
-  if (!clientInstance) clientInstance = new Anthropic(); // liest ANTHROPIC_API_KEY/BASE_URL
-  return clientInstance;
-}
 
 // ---------------------------------------------------------------------------
 // Kontext-Aufbereitung (pur, testbar)
@@ -113,14 +104,6 @@ async function findRelevantKbArticles(subject: string, limit = 3) {
   });
 }
 
-function textOf(response: Anthropic.Message): string {
-  return response.content
-    .filter((block): block is Anthropic.TextBlock => block.type === "text")
-    .map((block) => block.text)
-    .join("\n")
-    .trim();
-}
-
 // ---------------------------------------------------------------------------
 // 1) Antwortentwurf
 // ---------------------------------------------------------------------------
@@ -136,10 +119,8 @@ export async function draftReply(ticketId: string): Promise<string> {
           .join("\n\n")}`
       : "";
 
-  const response = await client().messages.create({
-    model: MODEL(),
-    max_tokens: 4096,
-    thinking: { type: "adaptive" },
+  const draft = await aiComplete({
+    maxTokens: 4096,
     system: `Du bist ein erfahrener Support-Agent von SmartLife (Software-Unternehmen).
 Du entwirfst Antworten an Kunden, die ein menschlicher Agent vor dem Versand prüft.
 
@@ -167,7 +148,6 @@ Entwirf jetzt die nächste Antwort an den Kunden.`,
     ],
   });
 
-  const draft = textOf(response);
   if (!draft) throw new Error("KI-Antwort war leer");
   return draft;
 }
@@ -179,10 +159,8 @@ Entwirf jetzt die nächste Antwort an den Kunden.`,
 export async function summarizeTicket(ticketId: string, userId: string): Promise<void> {
   const { ticket, transcript } = await buildTicketContext(ticketId);
 
-  const response = await client().messages.create({
-    model: MODEL(),
-    max_tokens: 2048,
-    thinking: { type: "adaptive" },
+  const summary = await aiComplete({
+    maxTokens: 2048,
     system: `Du fasst Support-Ticketverläufe für Kollegen zusammen, die das Ticket übernehmen.
 Antworte auf Deutsch, kompakt und sachlich, in dieser Struktur:
 Anliegen: <1-2 Sätze>
@@ -196,7 +174,6 @@ Offene Punkte: <was als Nächstes zu tun ist / worauf gewartet wird>`,
     ],
   });
 
-  const summary = textOf(response);
   if (!summary) throw new Error("KI-Zusammenfassung war leer");
 
   await db.message.create({
@@ -230,13 +207,11 @@ export async function classifyTicket(ticketId: string): Promise<void> {
   const { ticket, transcript } = await buildTicketContext(ticketId);
   const categories = await db.ticketCategory.findMany({ where: { isActive: true } });
 
-  const response = await client().messages.parse({
-    model: MODEL(),
-    max_tokens: 1024,
-    output_config: {
-      effort: "low",
-      format: zodOutputFormat(classificationSchema),
-    },
+  const result = await aiCompleteStructured({
+    maxTokens: 1024,
+    schema: classificationSchema,
+    schemaName: "ticket_classification",
+    lowEffort: true,
     system:
       "Du klassifizierst eingehende Support-Tickets eines Software-Unternehmens. Antworte ausschließlich im vorgegebenen JSON-Format.",
     messages: [
@@ -253,7 +228,6 @@ ${transcript.slice(0, 6000)}`,
     ],
   });
 
-  const result = response.parsed_output;
   if (!result) return;
 
   const applied: Record<string, string> = {};

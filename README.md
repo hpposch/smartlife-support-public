@@ -62,13 +62,13 @@ Die Entscheidung für den Eigenbau ist dann sinnvoll, wenn tiefe Produktintegrat
 - ✅ **CSAT:** Bewertungs-Mail (1–5) nach Lösung, öffentliche Bewertungsseite, Auswertung im Reporting (`CSAT_ENABLED=true`)
 - ✅ **Reporting** unter `/reports` (Teamleitung/Admin): Kennzahlen, SLA-Quoten, CSAT, nach Kategorie/Agent, Tagesverlauf, CSV-Export
 - ✅ **Webhooks:** signierte POSTs (`X-Signature`, HMAC-SHA256) bei `ticket.created/replied/resolved/closed`, Retry + Auto-Deaktivierung
-**Phase 4 (KI-Unterstützung, Claude API) ist implementiert:**
+**Phase 4 (KI-Unterstützung) ist implementiert:**
 
 - ✅ **KI-Antwortentwürfe:** „✨ KI-Entwurf“ im Ticket erstellt einen Antwortvorschlag aus dem Ticketverlauf + passenden Wissensdatenbank-Artikeln — der Agent prüft und sendet
 - ✅ **Zusammenfassung:** „✨ Zusammenfassen“ hängt eine kompakte Verlaufszusammenfassung als interne Notiz an (praktisch bei Ticket-Übergaben)
 - ✅ **Auto-Klassifizierung:** Neue Tickets werden im Worker automatisch klassifiziert — Kategorie (nur wenn leer, Regeln haben Vorrang), Prioritätsanhebung bei Dringlichkeit, Tag „verärgert“ bei negativer Stimmung; jede Änderung im Audit-Log
 - ✅ **Chat-Assistent** in Hilfe-Center und Portal: schwebendes Chat-Widget, beantwortet Fragen auf Basis der Wissensdatenbank (mit Artikel-Links) und bietet bei Bedarf die Ticket-Erstellung an — das Ticket enthält den kompletten Chatverlauf (Kanal `chat`); anonyme Besucher geben ihre E-Mail an, eingeloggte Kunden werden übernommen; Rate-Limits gegen Missbrauch
-- ✅ Aktivierung per `ANTHROPIC_API_KEY` (Modell: `claude-opus-4-8`, via `AI_MODEL` änderbar); ohne Key sind alle KI-Funktionen (inkl. Chat-Widget) ausgeblendet — das System läuft vollständig ohne
+- ✅ **Zwei Provider zur Wahl** (siehe `.env.example`): **Claude API** — `ANTHROPIC_API_KEY` setzen (Modell: `claude-opus-4-8`, via `AI_MODEL` änderbar) — **oder eine beliebige OpenAI-kompatible API** (OpenAI, Azure OpenAI, OpenRouter, LiteLLM, Ollama, vLLM …) über `AI_BASE_URL` + `AI_API_KEY` + `AI_MODEL`. Strukturierte Ausgaben nutzen dort `response_format: json_schema`; Server ohne diesen Support bekommen automatisch einen zweiten Versuch mit Schema im Prompt. Ist keine der Varianten konfiguriert, sind alle KI-Funktionen (inkl. Chat-Widget) ausgeblendet — das System läuft vollständig ohne
 - ⬜ Restliche P2/P3-Punkte: Custom Fields, gespeicherte Ansichten, Merge, Kollisionserkennung, Makros, Englisch
 
 ## Entwicklung starten

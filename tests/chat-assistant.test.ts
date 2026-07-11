@@ -4,7 +4,7 @@ import { clampChat, formatTranscript, CHAT_LIMITS } from "../src/server/chat-ass
 describe("clampChat", () => {
   it("begrenzt Anzahl und Länge", () => {
     const history = Array.from({ length: 30 }, (_, i) => ({
-      role: (i % 2 === 0 ? "user" : "assistant") as const,
+      role: i % 2 === 0 ? ("user" as const) : ("assistant" as const),
       text: "x".repeat(10_000),
     }));
     const clamped = clampChat(history);

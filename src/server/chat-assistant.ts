@@ -1,20 +1,11 @@
 // KI-Chat-Assistent für Hilfe-Center und Kundenportal: beantwortet Fragen
 // auf Basis der Wissensdatenbank und bietet bei Bedarf an, ein Support-
 // Ticket mit dem kompletten Chatverlauf zu erstellen.
-import Anthropic from "@anthropic-ai/sdk";
-import { zodOutputFormat } from "@anthropic-ai/sdk/helpers/zod";
 import * as z from "zod/v4";
 import { db } from "@/lib/db";
 import { renderMarkdown } from "@/lib/markdown";
 import { extractKeywords } from "./ai";
-
-const MODEL = () => process.env.AI_MODEL ?? "claude-opus-4-8";
-
-let clientInstance: Anthropic | null = null;
-function client(): Anthropic {
-  if (!clientInstance) clientInstance = new Anthropic();
-  return clientInstance;
-}
+import { aiCompleteStructured } from "./ai-provider";
 
 export interface ChatMessage {
   role: "user" | "assistant";
@@ -93,12 +84,10 @@ export async function assistantReply(history: ChatMessage[]): Promise<AssistantR
           .join("\n\n")}`
       : "\n\n(Keine passenden Wissensdatenbank-Artikel gefunden.)";
 
-  const response = await client().messages.parse({
-    model: MODEL(),
-    max_tokens: 2048,
-    output_config: {
-      format: zodOutputFormat(responseSchema),
-    },
+  const parsed = await aiCompleteStructured({
+    maxTokens: 2048,
+    schema: responseSchema,
+    schemaName: "chat_reply",
     system: `Du bist der Chat-Assistent des smartlife-BI-Supportportals (Business-Intelligence-Software).
 
 Regeln:
@@ -108,13 +97,9 @@ Regeln:
 - Halte Antworten kompakt (wenige Absätze, gern Aufzählungen)
 - Setze offer_ticket auf true, wenn du nicht sicher weiterhelfen kannst, das Anliegen kontospezifisch ist (Rechnung, Zugang, Fehler in der Umgebung des Kunden) oder der Kunde menschliche Hilfe wünscht — biete das Ticket dann auch im Antworttext an
 - Du kannst KEINE Aktionen ausführen (nichts ändern, nichts einsehen) — nur informieren und die Ticket-Erstellung anbieten${kbContext}`,
-    messages: chat.map((m) => ({
-      role: m.role,
-      content: [{ type: "text" as const, text: m.text }],
-    })),
+    messages: chat.map((m) => ({ role: m.role, content: m.text })),
   });
 
-  const parsed = response.parsed_output;
   if (!parsed) throw new Error("Assistent-Antwort nicht parsebar");
 
   return {
