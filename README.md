@@ -110,6 +110,20 @@ Hinweise für den Betrieb mit Gmail:
 - Für die Zustellbarkeit sollten **SPF/DKIM für smartlifebi.com** in Google Workspace eingerichtet sein (Admin-Konsole → Apps → Google Workspace → Gmail → E-Mail-Authentifizierung)
 - Ändert Gmail die interne IMAP-Nummerierung (UIDVALIDITY), erkennt der Poller das und beginnt den Abruf neu — Duplikate entstehen dabei nicht (Message-ID-Schutz)
 
+### Wissensdatenbank: Bold-BI-Doku importieren (Rebranding auf smartlife BI)
+
+Importiert alle ~890 Artikel aus [boldbi/bold-bi-docs](https://github.com/boldbi/bold-bi-docs) in das Hilfe-Center — inkl. Bilder, Kategorien und umgeschriebener interner Links. Dabei wird durchgängig **„Bold BI" → „smartlife BI"** und **„Syncfusion" → „smartlife"** ersetzt (anpassbar über die Konstanten am Skriptanfang):
+
+```bash
+git clone --depth 1 https://github.com/boldbi/bold-bi-docs.git /tmp/bold-bi-docs
+npx tsx scripts/import-boldbi-docs.ts /tmp/bold-bi-docs
+```
+
+- Idempotent: erneutes Ausführen (z. B. nach einem Doku-Update) aktualisiert bestehende Artikel
+- Bilder (~300 MB) landen in `DATA_DIR/kb-assets` und werden über `/kb-assets/…` ausgeliefert (damit auch im Backup enthalten)
+- Links auf `help.boldbi.com` werden auf die importierten Artikel gemappt, `www.boldbi.com`/`syncfusion.com` auf `www.smartlifebi.com`, `support.boldbi.com` auf das Hilfe-Center; nur `cdn.boldbi.com` bleibt (lauffähige SDK-Code-Beispiele)
+- Voraussetzung: Die Weiterverwendung der Dokumentation sollte durch Ihre OEM-/Reseller-Vereinbarung mit Syncfusion abgedeckt sein
+
 ### Azure AD B2C für das Kundenportal einrichten
 
 1. Im B2C-Tenant eine **App-Registrierung** (Typ *Web*) anlegen; Redirect-URI: `https://<APP_URL>/portal/auth/b2c/callback`, Client-Secret erzeugen

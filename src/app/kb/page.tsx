@@ -6,9 +6,9 @@ import { getCurrentContact } from "@/lib/portal-session";
 export default async function KbHomePage({
   searchParams,
 }: {
-  searchParams: Promise<{ q?: string }>;
+  searchParams: Promise<{ q?: string; kategorie?: string }>;
 }) {
-  const { q } = await searchParams;
+  const { q, kategorie } = await searchParams;
   const contact = await getCurrentContact();
 
   // Öffentliche Artikel für alle; "customers" zusätzlich für eingeloggte Kunden
@@ -17,7 +17,17 @@ export default async function KbHomePage({
     : { visibility: "public" };
   const base: Prisma.KbArticleWhereInput = { status: "published", ...visibility };
 
-  const where: Prisma.KbArticleWhereInput = q?.trim()
+  const categories = await db.kbCategory.findMany({
+    orderBy: [{ sortOrder: "asc" }, { name: "asc" }],
+    include: { _count: { select: { articles: { where: base } } } },
+  });
+
+  const activeCategory = kategorie
+    ? categories.find((c) => c.slug === kategorie)
+    : null;
+
+  // Artikel-Liste nur bei Suche oder gewählter Kategorie
+  const where: Prisma.KbArticleWhereInput | null = q?.trim()
     ? {
         ...base,
         OR: [
@@ -25,74 +35,78 @@ export default async function KbHomePage({
           { bodyMarkdown: { contains: q.trim(), mode: "insensitive" } },
         ],
       }
-    : base;
+    : activeCategory
+      ? { ...base, categoryId: activeCategory.id }
+      : null;
 
-  const [articles, categories] = await Promise.all([
-    db.kbArticle.findMany({
-      where,
-      include: { category: true },
-      orderBy: { updatedAt: "desc" },
-      take: 100,
-    }),
-    db.kbCategory.findMany({ orderBy: { sortOrder: "asc" } }),
-  ]);
-
-  const byCategory = new Map<string, typeof articles>();
-  for (const article of articles) {
-    const key = article.category?.name ?? "Allgemein";
-    byCategory.set(key, [...(byCategory.get(key) ?? []), article]);
-  }
+  const articles = where
+    ? await db.kbArticle.findMany({
+        where,
+        include: { category: true },
+        orderBy: { title: "asc" },
+        take: 500,
+      })
+    : [];
 
   return (
     <div>
       <div className="mb-8 text-center">
         <h1 className="text-2xl font-semibold">Wie können wir helfen?</h1>
         <form method="GET" className="mx-auto mt-4 flex max-w-lg gap-2">
-          <input
-            name="q"
-            defaultValue={q ?? ""}
-            placeholder="Suchbegriff …"
-            className="input"
-          />
+          <input name="q" defaultValue={q ?? ""} placeholder="Suchbegriff …" className="input" />
           <button type="submit" className="btn-primary shrink-0">
             Suchen
           </button>
         </form>
       </div>
 
-      {articles.length === 0 && (
-        <p className="text-center text-slate-500">
-          {q ? "Keine Artikel gefunden." : "Noch keine Artikel veröffentlicht."}
-        </p>
+      {where ? (
+        <div>
+          <p className="mb-4 text-sm text-slate-500">
+            <Link href="/kb" className="text-blue-700 hover:underline">
+              ← Alle Kategorien
+            </Link>
+            <span className="ml-3">
+              {activeCategory && !q ? activeCategory.name : `Suche nach „${q}“`} — {articles.length}{" "}
+              Artikel
+            </span>
+          </p>
+          {articles.length === 0 && <p className="text-center text-slate-500">Keine Artikel gefunden.</p>}
+          <ul className="grid gap-2 sm:grid-cols-2">
+            {articles.map((article) => (
+              <li key={article.id}>
+                <Link
+                  href={`/kb/${article.slug}`}
+                  className="block rounded-lg border border-slate-200 bg-white px-4 py-3 shadow-sm hover:border-blue-300"
+                >
+                  <span className="text-sm font-medium hover:text-blue-700">{article.title}</span>
+                  {q && article.category && (
+                    <span className="mt-0.5 block text-xs text-slate-400">{article.category.name}</span>
+                  )}
+                </Link>
+              </li>
+            ))}
+          </ul>
+        </div>
+      ) : (
+        <div className="grid gap-3 sm:grid-cols-2 lg:grid-cols-3">
+          {categories
+            .filter((cat) => cat._count.articles > 0)
+            .map((cat) => (
+              <Link
+                key={cat.id}
+                href={`/kb?kategorie=${cat.slug}`}
+                className="rounded-lg border border-slate-200 bg-white p-4 shadow-sm hover:border-blue-300"
+              >
+                <h2 className="font-medium">{cat.name}</h2>
+                <p className="mt-1 text-sm text-slate-400">{cat._count.articles} Artikel</p>
+              </Link>
+            ))}
+          {categories.every((cat) => cat._count.articles === 0) && (
+            <p className="col-span-full text-center text-slate-500">Noch keine Artikel veröffentlicht.</p>
+          )}
+        </div>
       )}
-
-      <div className="space-y-8">
-        {[...byCategory.entries()]
-          .sort(([a], [b]) => {
-            const ia = categories.findIndex((c) => c.name === a);
-            const ib = categories.findIndex((c) => c.name === b);
-            return (ia === -1 ? 999 : ia) - (ib === -1 ? 999 : ib);
-          })
-          .map(([categoryName, items]) => (
-            <section key={categoryName}>
-              <h2 className="mb-3 text-sm font-semibold uppercase tracking-wide text-slate-500">
-                {categoryName}
-              </h2>
-              <ul className="grid gap-2 sm:grid-cols-2">
-                {items.map((article) => (
-                  <li key={article.id}>
-                    <Link
-                      href={`/kb/${article.slug}`}
-                      className="block rounded-lg border border-slate-200 bg-white px-4 py-3 text-sm font-medium shadow-sm hover:border-blue-300 hover:text-blue-700"
-                    >
-                      {article.title}
-                    </Link>
-                  </li>
-                ))}
-              </ul>
-            </section>
-          ))}
-      </div>
     </div>
   );
 }
