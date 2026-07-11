@@ -119,10 +119,28 @@ git clone --depth 1 https://github.com/boldbi/bold-bi-docs.git /tmp/bold-bi-docs
 npx tsx scripts/import-boldbi-docs.ts /tmp/bold-bi-docs
 ```
 
-- Idempotent: erneutes Ausführen (z. B. nach einem Doku-Update) aktualisiert bestehende Artikel
 - Bilder (~300 MB) landen in `DATA_DIR/kb-assets` und werden über `/kb-assets/…` ausgeliefert (damit auch im Backup enthalten)
-- Links auf `help.boldbi.com` werden auf die importierten Artikel gemappt, `www.boldbi.com`/`syncfusion.com` auf `www.smartlifebi.com`, `support.boldbi.com` auf das Hilfe-Center; nur `cdn.boldbi.com` bleibt (lauffähige SDK-Code-Beispiele)
+- **Links:** Interne Doku-Verweise und `help.boldbi.com`-Links werden **relativ** auf `/kb/<artikel>` umgeschrieben — sie zeigen damit automatisch auf die Domain, unter der das Hilfe-Center läuft (z. B. `support.smartlifebi.com/kb/…`), ohne dass eine Domain im Skript verdrahtet ist. `www.boldbi.com`/`syncfusion.com` → `www.smartlifebi.com`, `support.boldbi.com` → `/kb`. Nur `cdn.boldbi.com` bleibt (lauffähige SDK-Code-Beispiele).
+- **Logo in Screenshots ersetzen** (nach jedem Import ausführen):
+  ```bash
+  pip install opencv-python-headless numpy pillow   # einmalig
+  python3 scripts/replace-logo.py --logo scripts/assets/smartlife-logo.png
+  ```
 - Voraussetzung: Die Weiterverwendung der Dokumentation sollte durch Ihre OEM-/Reseller-Vereinbarung mit Syncfusion abgedeckt sein
+
+**Doku-Update einspielen** (wenn Bold BI die Dokumentation aktualisiert) — der Import ist idempotent, einfach denselben Ablauf wiederholen:
+
+```bash
+cd /tmp/bold-bi-docs && git pull        # oder frisch klonen
+cd /pfad/zur/installation
+npx tsx scripts/import-boldbi-docs.ts /tmp/bold-bi-docs   # aktualisiert bestehende, legt neue an
+python3 scripts/replace-logo.py --logo scripts/assets/smartlife-logo.png
+```
+
+Verhalten beim Update:
+- Bestehende Artikel werden **aktualisiert** (gleicher Slug), neue angelegt — **Ausgeblendet-Status von Artikeln und Kategorien bleibt erhalten**
+- Im Repo **entfernte** Artikel werden gemeldet; mit `--prune` werden sie gelöscht
+- ⚠️ Manuelle Textänderungen an *importierten* Artikeln werden beim Update überschrieben — eigene Artikel (ohne Import-Herkunft) sind nie betroffen
 
 ### Azure AD B2C für das Kundenportal einrichten
 

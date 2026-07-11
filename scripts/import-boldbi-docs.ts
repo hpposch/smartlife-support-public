@@ -3,7 +3,7 @@
 //   "Syncfusion" → smartlife
 //
 //   git clone --depth 1 https://github.com/boldbi/bold-bi-docs.git /tmp/bold-bi-docs
-//   npx tsx scripts/import-boldbi-docs.ts /tmp/bold-bi-docs [--limit N] [--dry-run]
+//   npx tsx scripts/import-boldbi-docs.ts /tmp/bold-bi-docs [--limit N] [--dry-run] [--prune]
 //
 // Der Import ist idempotent (Slug aus dem Dateipfad): erneutes Ausführen
 // aktualisiert bestehende Artikel. Bilder werden in die Datei-Ablage kopiert
@@ -72,13 +72,14 @@ export function rebrand(text: string): string {
  */
 export function rewriteExternalUrls(body: string, linkMap: Map<string, string>): string {
   return body
-    .replace(/https?:\/\/help\.boldbi\.com(\/[a-z0-9/._-]*?)\/?(#[^)\s"'<]*)?(?=[)\s"'<]|$)/gi, (full, urlPath, fragment) => {
+    .replace(/https?:\/\/help\.boldbi\.com(\/[a-z0-9/._-]*?)\/?(#[^)\s"'<>]*)?(?=[)\s"'<>]|$)/gi, (_full, urlPath, fragment) => {
       const slug = linkMap.get(String(urlPath).replace(/\/$/, ""));
-      return slug ? `/kb/${slug}${fragment ?? ""}` : full;
+      // Nicht auflösbare Doku-Pfade (im Repo entfernt) → Hilfe-Center-Startseite
+      return slug ? `/kb/${slug}${fragment ?? ""}` : "/kb";
     })
-    .replace(/https?:\/\/support\.boldbi\.com[^)\s"'<]*/gi, "/kb")
-    .replace(/https?:\/\/(www\.)?boldbi\.com[^)\s"'<]*/gi, BRAND_WEBSITE)
-    .replace(/https?:\/\/[a-z0-9.-]*syncfusion\.com[^)\s"'<]*/gi, BRAND_WEBSITE);
+    .replace(/https?:\/\/support\.boldbi\.com[^)\s"'<>]*/gi, "/kb")
+    .replace(/https?:\/\/(www\.)?boldbi\.com[^)\s"'<>]*/gi, BRAND_WEBSITE)
+    .replace(/https?:\/\/[a-z0-9.-]*syncfusion\.com[^)\s"'<>]*/gi, BRAND_WEBSITE);
 }
 
 /** Stabiler, eindeutiger Slug aus dem Repo-Pfad. */
@@ -143,6 +144,7 @@ async function main() {
   const limitArg = process.argv.indexOf("--limit");
   const limit = limitArg > -1 ? Number(process.argv[limitArg + 1]) : Infinity;
   const dryRun = process.argv.includes("--dry-run");
+  const prune = process.argv.includes("--prune");
 
   const { readdir } = await import("node:fs/promises");
   async function walk(dir: string): Promise<string[]> {
@@ -241,6 +243,31 @@ async function main() {
         copied++;
       } catch {
         missing++;
+      }
+    }
+  }
+
+  // Verwaiste importierte Artikel: existieren in der KB, aber nicht mehr im
+  // Repo (Doku-Seite wurde entfernt/verschoben). Erkennbar am Hash-Suffix
+  // unserer Import-Slugs. Ohne --prune nur melden, mit --prune löschen.
+  if (!dryRun && limit === Infinity) {
+    const currentSlugs = new Set(parsed.map((doc) => doc.slug));
+    const imported = await db.kbArticle.findMany({
+      select: { id: true, slug: true, title: true },
+    });
+    const orphans = imported.filter(
+      (a) => /-[0-9a-f]{6}$/.test(a.slug) && !currentSlugs.has(a.slug)
+    );
+    if (orphans.length > 0) {
+      if (prune) {
+        await db.kbArticle.deleteMany({ where: { id: { in: orphans.map((o) => o.id) } } });
+        console.log(`${orphans.length} verwaiste Artikel gelöscht (--prune)`);
+      } else {
+        console.log(
+          `${orphans.length} Artikel existieren nicht mehr im Repo (mit --prune löschen):`
+        );
+        for (const orphan of orphans.slice(0, 10)) console.log(`  - ${orphan.title}`);
+        if (orphans.length > 10) console.log(`  … und ${orphans.length - 10} weitere`);
       }
     }
   }

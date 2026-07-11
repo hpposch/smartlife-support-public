@@ -105,13 +105,14 @@ describe("rewriteExternalUrls", () => {
     ).toBe("[a](/kb/working-with-dashboards-edit-abc123)");
   });
 
-  it("lässt unbekannte help-Pfade stehen, mappt support/www/syncfusion", () => {
+  it("mappt unbekannte help-Pfade aufs Hilfe-Center, support/www/syncfusion auf eigene Ziele", () => {
     const out = rewriteExternalUrls(
       "[a](https://help.boldbi.com/unbekannt/) [b](https://support.boldbi.com/kb/article/123/x) [c](https://www.boldbi.com/pricing) [d](https://help.syncfusion.com/lizenz)",
       linkMap
     );
-    expect(out).toContain("https://help.boldbi.com/unbekannt/");
-    expect(out).toContain("](/kb)");
+    expect(out).not.toContain("boldbi.com");
+    expect(out).toContain("[a](/kb)");
+    expect(out).toContain("[b](/kb)");
     expect(out).toContain("](https://www.smartlifebi.com)");
     expect(out).not.toContain("syncfusion");
   });
