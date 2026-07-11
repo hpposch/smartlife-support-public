@@ -328,10 +328,12 @@ model TicketEvent {
 }
 
 model KbCategory {
-  id        String @id @default(uuid())
+  id        String  @id @default(uuid())
   name      String
-  slug      String @unique
-  sortOrder Int    @default(0) @map("sort_order")
+  slug      String  @unique
+  sortOrder Int     @default(0) @map("sort_order")
+  // Ausgeblendete Kategorien (inkl. aller Artikel) erscheinen nicht im Hilfe-Center
+  isHidden  Boolean @default(false) @map("is_hidden")
 
   articles KbArticle[]
 

@@ -15,11 +15,16 @@ export default async function KbHomePage({
   const visibility: Prisma.KbArticleWhereInput = contact
     ? { visibility: { in: ["public", "customers"] } }
     : { visibility: "public" };
-  const base: Prisma.KbArticleWhereInput = { status: "published", ...visibility };
+  const base: Prisma.KbArticleWhereInput = {
+    status: "published",
+    ...visibility,
+    OR: [{ categoryId: null }, { category: { isHidden: false } }],
+  };
 
   const categories = await db.kbCategory.findMany({
+    where: { isHidden: false },
     orderBy: [{ sortOrder: "asc" }, { name: "asc" }],
-    include: { _count: { select: { articles: { where: base } } } },
+    include: { _count: { select: { articles: { where: { status: "published", ...visibility } } } } },
   });
 
   const activeCategory = kategorie
@@ -29,14 +34,18 @@ export default async function KbHomePage({
   // Artikel-Liste nur bei Suche oder gewählter Kategorie
   const where: Prisma.KbArticleWhereInput | null = q?.trim()
     ? {
-        ...base,
-        OR: [
-          { title: { contains: q.trim(), mode: "insensitive" } },
-          { bodyMarkdown: { contains: q.trim(), mode: "insensitive" } },
+        AND: [
+          base,
+          {
+            OR: [
+              { title: { contains: q.trim(), mode: "insensitive" } },
+              { bodyMarkdown: { contains: q.trim(), mode: "insensitive" } },
+            ],
+          },
         ],
       }
     : activeCategory
-      ? { ...base, categoryId: activeCategory.id }
+      ? { AND: [base, { categoryId: activeCategory.id }] }
       : null;
 
   const articles = where

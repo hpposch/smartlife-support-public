@@ -103,6 +103,7 @@ async function findRelevantKbArticles(subject: string, limit = 3) {
   return db.kbArticle.findMany({
     where: {
       status: "published",
+      AND: [{ OR: [{ categoryId: null }, { category: { isHidden: false } }] }],
       OR: keywords.flatMap((kw) => [
         { title: { contains: kw, mode: "insensitive" as const } },
         { bodyMarkdown: { contains: kw, mode: "insensitive" as const } },

@@ -1,11 +1,13 @@
 import Link from "next/link";
 import { revalidatePath } from "next/cache";
+import type { Prisma } from "@prisma/client";
 import { requireAdmin } from "@/lib/auth";
 import { db } from "@/lib/db";
 import { formatDateTime } from "@/lib/labels";
 import { slugify } from "@/lib/markdown";
 
-const STATUS_LABELS = { draft: "Entwurf", published: "Veröffentlicht", archived: "Archiviert" };
+const PAGE_SIZE = 50;
+const STATUS_LABELS = { draft: "Ausgeblendet", published: "Veröffentlicht", archived: "Archiviert" };
 const VISIBILITY_LABELS = { public: "Öffentlich", customers: "Nur Kunden", internal: "Intern" };
 
 async function createCategory(formData: FormData) {
@@ -20,24 +22,124 @@ async function createCategory(formData: FormData) {
   revalidatePath("/settings/kb");
 }
 
-export default async function KbAdminPage() {
+async function toggleCategoryHidden(formData: FormData) {
+  "use server";
   await requireAdmin();
-  const [articles, categories] = await Promise.all([
+  const id = String(formData.get("id"));
+  const category = await db.kbCategory.findUniqueOrThrow({ where: { id } });
+  await db.kbCategory.update({ where: { id }, data: { isHidden: !category.isHidden } });
+  revalidatePath("/settings/kb");
+  revalidatePath("/kb");
+}
+
+/** Artikel ausblenden (→ Entwurf) bzw. wieder veröffentlichen. */
+async function toggleArticleHidden(formData: FormData) {
+  "use server";
+  await requireAdmin();
+  const id = String(formData.get("id"));
+  const article = await db.kbArticle.findUniqueOrThrow({ where: { id } });
+  await db.kbArticle.update({
+    where: { id },
+    data:
+      article.status === "published"
+        ? { status: "draft" }
+        : { status: "published", publishedAt: article.publishedAt ?? new Date() },
+  });
+  revalidatePath("/settings/kb");
+  revalidatePath("/kb");
+}
+
+export default async function KbAdminPage({
+  searchParams,
+}: {
+  searchParams: Promise<{ q?: string; cat?: string; page?: string }>;
+}) {
+  await requireAdmin();
+  const { q, cat, page: pageParam } = await searchParams;
+  const page = Math.max(1, Number(pageParam) || 1);
+
+  const where: Prisma.KbArticleWhereInput = {
+    ...(q?.trim() ? { title: { contains: q.trim(), mode: "insensitive" } } : {}),
+    ...(cat ? { categoryId: cat } : {}),
+  };
+
+  const [articles, total, categories] = await Promise.all([
     db.kbArticle.findMany({
-      include: { category: true, author: true },
-      orderBy: { updatedAt: "desc" },
+      where,
+      include: { category: true },
+      orderBy: { title: "asc" },
+      take: PAGE_SIZE,
+      skip: (page - 1) * PAGE_SIZE,
     }),
-    db.kbCategory.findMany({ orderBy: { sortOrder: "asc" } }),
+    db.kbArticle.count({ where }),
+    db.kbCategory.findMany({
+      orderBy: [{ sortOrder: "asc" }, { name: "asc" }],
+      include: { _count: { select: { articles: true } } },
+    }),
   ]);
+  const totalPages = Math.max(1, Math.ceil(total / PAGE_SIZE));
 
   return (
-    <div className="mx-auto max-w-4xl space-y-6">
+    <div className="mx-auto max-w-5xl space-y-6">
       <div className="flex items-center justify-between">
-        <h1 className="text-lg font-semibold">Wissensdatenbank</h1>
+        <h1 className="text-lg font-semibold">
+          Wissensdatenbank <span className="text-sm font-normal text-slate-500">({total} Artikel)</span>
+        </h1>
         <Link href="/settings/kb/new" className="btn-primary">
           Neuer Artikel
         </Link>
       </div>
+
+      <div className="rounded-lg border border-slate-200 bg-white p-4 shadow-sm">
+        <h2 className="mb-3 text-sm font-semibold">Kategorien</h2>
+        <p className="mb-3 text-xs text-slate-500">
+          Ausgeblendete Kategorien verschwinden mit allen Artikeln aus dem Hilfe-Center.
+        </p>
+        <ul className="mb-3 flex flex-wrap gap-2">
+          {categories.map((category) => (
+            <li
+              key={category.id}
+              className={`flex items-center gap-2 rounded-md border px-2 py-1 text-xs ${
+                category.isHidden
+                  ? "border-slate-200 bg-slate-100 text-slate-400"
+                  : "border-slate-200 bg-white text-slate-700"
+              }`}
+            >
+              <span className={category.isHidden ? "line-through" : ""}>
+                {category.name} ({category._count.articles})
+              </span>
+              <form action={toggleCategoryHidden}>
+                <input type="hidden" name="id" value={category.id} />
+                <button type="submit" className="text-blue-700 hover:underline">
+                  {category.isHidden ? "Einblenden" : "Ausblenden"}
+                </button>
+              </form>
+            </li>
+          ))}
+          {categories.length === 0 && <li className="text-sm text-slate-400">Noch keine.</li>}
+        </ul>
+        <form action={createCategory} className="flex gap-2">
+          <input name="name" required placeholder="Neue Kategorie" className="input max-w-xs" />
+          <button type="submit" className="btn-secondary shrink-0">
+            Hinzufügen
+          </button>
+        </form>
+      </div>
+
+      <form method="GET" className="flex flex-wrap items-center gap-2">
+        <input name="q" defaultValue={q ?? ""} placeholder="Titel durchsuchen …" className="input w-72" />
+        <select name="cat" defaultValue={cat ?? ""} className="input w-auto">
+          <option value="">Alle Kategorien</option>
+          {categories.map((category) => (
+            <option key={category.id} value={category.id}>
+              {category.name}
+            </option>
+          ))}
+        </select>
+        <button type="submit" className="btn-secondary">
+          Filtern
+        </button>
+      </form>
 
       <div className="overflow-hidden rounded-lg border border-slate-200 bg-white shadow-sm">
         <table className="w-full text-sm">
@@ -48,22 +150,23 @@ export default async function KbAdminPage() {
               <th className="px-4 py-2">Status</th>
               <th className="px-4 py-2">Sichtbarkeit</th>
               <th className="px-4 py-2">Aktualisiert</th>
+              <th className="px-4 py-2" />
             </tr>
           </thead>
           <tbody>
             {articles.length === 0 && (
               <tr>
-                <td colSpan={5} className="px-4 py-8 text-center text-slate-400">
-                  Noch keine Artikel.
+                <td colSpan={6} className="px-4 py-8 text-center text-slate-400">
+                  Keine Artikel gefunden.
                 </td>
               </tr>
             )}
             {articles.map((article) => (
               <tr key={article.id} className="border-b border-slate-100 last:border-0">
-                <td className="px-4 py-2">
+                <td className="max-w-md px-4 py-2">
                   <Link
                     href={`/settings/kb/${article.id}`}
-                    className="font-medium hover:text-blue-700"
+                    className={`font-medium hover:text-blue-700 ${article.status !== "published" ? "text-slate-400" : ""}`}
                   >
                     {article.title}
                   </Link>
@@ -84,29 +187,35 @@ export default async function KbAdminPage() {
                 </td>
                 <td className="px-4 py-2 text-slate-600">{VISIBILITY_LABELS[article.visibility]}</td>
                 <td className="px-4 py-2 text-slate-500">{formatDateTime(article.updatedAt)}</td>
+                <td className="px-4 py-2 text-right">
+                  <form action={toggleArticleHidden}>
+                    <input type="hidden" name="id" value={article.id} />
+                    <button type="submit" className="text-xs text-blue-700 hover:underline">
+                      {article.status === "published" ? "Ausblenden" : "Veröffentlichen"}
+                    </button>
+                  </form>
+                </td>
               </tr>
             ))}
           </tbody>
         </table>
       </div>
 
-      <div className="rounded-lg border border-slate-200 bg-white p-4 shadow-sm">
-        <h2 className="mb-3 text-sm font-semibold">Kategorien</h2>
-        <ul className="mb-3 flex flex-wrap gap-2">
-          {categories.map((cat) => (
-            <li key={cat.id} className="rounded bg-slate-100 px-2 py-1 text-xs text-slate-600">
-              {cat.name}
-            </li>
-          ))}
-          {categories.length === 0 && <li className="text-sm text-slate-400">Noch keine.</li>}
-        </ul>
-        <form action={createCategory} className="flex gap-2">
-          <input name="name" required placeholder="Neue Kategorie" className="input max-w-xs" />
-          <button type="submit" className="btn-secondary shrink-0">
-            Hinzufügen
-          </button>
-        </form>
-      </div>
+      {totalPages > 1 && (
+        <div className="flex items-center gap-2 text-sm text-slate-600">
+          Seite {page} von {totalPages}
+          {page > 1 && (
+            <Link className="btn-secondary" href={{ query: { q, cat, page: page - 1 } }}>
+              Zurück
+            </Link>
+          )}
+          {page < totalPages && (
+            <Link className="btn-secondary" href={{ query: { q, cat, page: page + 1 } }}>
+              Weiter
+            </Link>
+          )}
+        </div>
+      )}
     </div>
   );
 }

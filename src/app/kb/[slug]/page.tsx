@@ -18,6 +18,7 @@ export default async function KbArticlePage({
     include: { category: true },
   });
   if (!article || article.status !== "published") notFound();
+  if (article.category?.isHidden) notFound();
   if (article.visibility === "internal") notFound();
   if (article.visibility === "customers" && !contact) notFound();
 
