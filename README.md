@@ -45,7 +45,18 @@ Die Entscheidung für den Eigenbau ist dann sinnvoll, wenn tiefe Produktintegrat
 - ✅ Agenten-UI: Ticketliste mit Filtern & Suche, Ticketdetail mit Verlauf, Antwort/interne Notiz, Anhänge, Status/Priorität/Zuweisung/Kategorie/Tags, manuelles Ticket
 - ✅ Verwaltung: Benutzer, Postfächer, Kategorien, Textbausteine (mit Platzhaltern)
 - ✅ Audit-Log (`ticket_events`), Integrations-API (`POST /api/v1/tickets`), Docker-Compose-Deployment
-- ⬜ Phase 2–4: Kundenportal, Wissensdatenbank, SLA, Automatisierung, Reporting, KI (siehe Roadmap)
+
+**Härtung ist umgesetzt:**
+
+- ✅ **Backups als eine Datei:** täglich automatisch (Worker, `BACKUP_CRON`), manuell unter *Verwaltung → Backups* (inkl. Download); Wiederherstellung aus genau dieser Datei per `npm run backup:restore -- <datei>` — Datenbank **und** Anhänge/Roh-E-Mails zusammen
+- ✅ Login-Rate-Limiting, Security-Header, `/api/health` + Docker-Healthcheck, GitHub-Actions-CI
+
+**Phase 2 (Kundenportal + Wissensdatenbank) ist implementiert:**
+
+- ✅ Kundenportal unter `/portal`: passwortloser Login per Magic-Link (30 min gültig, Einmal-Verwendung, nur Hash in der DB), eigene Anfragen einsehen/beantworten/schließen, neue Anfrage per Formular — strikt auf den eigenen Kontakt beschränkt
+- ✅ Hilfe-Center unter `/kb`: öffentliche Wissensdatenbank mit Kategorien, Suche und Markdown-Artikeln; Sichtbarkeit pro Artikel (öffentlich / nur Kunden / intern); Pflege unter *Verwaltung → Wissensdatenbank*
+- ⬜ Restliche P2-Punkte: Custom Fields, gespeicherte Ansichten, Merge, Kollisionserkennung, Basis-Dashboard, Englisch
+- ⬜ Phase 3–4: SLA, Automatisierung, Reporting, KI (siehe Roadmap)
 
 ## Entwicklung starten
 

@@ -3,6 +3,7 @@
 // Speicherung der versendeten Message-ID für eingehendes Threading.
 import type Mail from "nodemailer/lib/mailer";
 import { db } from "@/lib/db";
+import { env } from "@/lib/env";
 import { readStoredFile } from "@/lib/storage";
 import { replySubject } from "@/lib/ticket-token";
 import { smtpTransport } from "./mailer";
@@ -90,12 +91,31 @@ export async function sendAgentReply(messageId: string): Promise<void> {
   }
 }
 
-/** Benachrichtigungs-Mails (Bestätigung, Agenten-Hinweis). */
-export async function sendNotification(job: {
-  kind: "ticket_confirmation" | "agent_new_message";
-  ticketId: string;
-  messageId?: string;
-}): Promise<void> {
+/** Benachrichtigungs-Mails (Bestätigung, Agenten-Hinweis, Portal-Login). */
+export async function sendNotification(
+  job:
+    | { kind: "ticket_confirmation" | "agent_new_message"; ticketId: string; messageId?: string }
+    | { kind: "portal_login"; contactId: string; token: string }
+): Promise<void> {
+  if (job.kind === "portal_login") {
+    const [contact, mailbox] = await Promise.all([
+      db.contact.findUniqueOrThrow({ where: { id: job.contactId } }),
+      db.mailbox.findFirst({ where: { isActive: true } }),
+    ]);
+    if (!mailbox) throw new Error("Kein aktives Postfach für den Versand konfiguriert");
+    if (contact.isBlocked || contact.anonymizedAt) return;
+    const url = `${env.appUrl}/portal/auth/${job.token}`;
+    const tpl = templates.portalLogin(contact.name, url);
+    await smtpTransport(mailbox).sendMail({
+      from: { name: "SmartLife Support", address: mailbox.address },
+      to: contact.email,
+      subject: tpl.subject,
+      html: tpl.html,
+      text: tpl.text,
+    });
+    return;
+  }
+
   const { ticket, mailbox } = await loadMailboxForTicket(job.ticketId);
 
   if (job.kind === "ticket_confirmation") {

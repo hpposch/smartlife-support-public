@@ -1,7 +1,8 @@
 import { NextRequest, NextResponse } from "next/server";
 
-// Schneller Redirect für nicht eingeloggte Besucher. Die eigentliche
-// Session-Prüfung passiert serverseitig in requireUser() auf jeder Seite.
+// Schneller Redirect für nicht eingeloggte Besucher des Agenten-Bereichs.
+// Die eigentliche Session-Prüfung passiert serverseitig in requireUser()
+// bzw. requireContact() auf jeder Seite.
 export function middleware(request: NextRequest) {
   const hasSession = request.cookies.has("smartlife_support_session");
   if (!hasSession && request.nextUrl.pathname !== "/login") {
@@ -13,6 +14,7 @@ export function middleware(request: NextRequest) {
 }
 
 export const config = {
-  // API-Routen (eigene Auth) und statische Dateien ausnehmen
-  matcher: ["/((?!api|_next/static|_next/image|favicon.ico).*)"],
+  // Öffentliche Bereiche (Portal, Wissensdatenbank) und Routen mit eigener
+  // Auth (API, Anhänge) sind ausgenommen
+  matcher: ["/((?!api|portal|kb|attachments|_next/static|_next/image|favicon.ico).*)"],
 };

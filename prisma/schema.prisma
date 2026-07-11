@@ -53,6 +53,18 @@ enum SendStatus {
   failed
 }
 
+enum KbStatus {
+  draft
+  published
+  archived
+}
+
+enum KbVisibility {
+  public
+  customers
+  internal
+}
+
 model User {
   id           String   @id @default(uuid())
   email        String   @unique
@@ -68,6 +80,7 @@ model User {
   messages        Message[]
   events          TicketEvent[]
   cannedResponses CannedResponse[]
+  kbArticles      KbArticle[]
 
   @@map("users")
 }
@@ -120,12 +133,29 @@ model Contact {
   createdAt      DateTime  @default(now()) @map("created_at")
   updatedAt      DateTime  @default(now()) @updatedAt @map("updated_at")
 
-  organization Organization? @relation(fields: [organizationId], references: [id], onDelete: SetNull)
+  organization Organization?      @relation(fields: [organizationId], references: [id], onDelete: SetNull)
   tickets      Ticket[]
   messages     Message[]
   events       TicketEvent[]
+  portalTokens PortalLoginToken[]
 
   @@map("contacts")
+}
+
+// Magic-Link-Login fürs Kundenportal: der Roh-Token steht nur im E-Mail-Link,
+// in der DB liegt ausschließlich sein SHA-256-Hash.
+model PortalLoginToken {
+  id        String    @id @default(uuid())
+  contactId String    @map("contact_id")
+  tokenHash String    @unique @map("token_hash")
+  expiresAt DateTime  @map("expires_at")
+  usedAt    DateTime? @map("used_at")
+  createdAt DateTime  @default(now()) @map("created_at")
+
+  contact Contact @relation(fields: [contactId], references: [id], onDelete: Cascade)
+
+  @@index([contactId])
+  @@map("portal_login_tokens")
 }
 
 model Mailbox {
@@ -281,6 +311,37 @@ model TicketEvent {
 
   @@index([ticketId, createdAt])
   @@map("ticket_events")
+}
+
+model KbCategory {
+  id        String @id @default(uuid())
+  name      String
+  slug      String @unique
+  sortOrder Int    @default(0) @map("sort_order")
+
+  articles KbArticle[]
+
+  @@map("kb_categories")
+}
+
+model KbArticle {
+  id           String       @id @default(uuid())
+  categoryId   String?      @map("category_id")
+  title        String
+  slug         String       @unique
+  bodyMarkdown String       @map("body_markdown")
+  status       KbStatus     @default(draft)
+  visibility   KbVisibility @default(public)
+  authorId     String?      @map("author_id")
+  publishedAt  DateTime?    @map("published_at")
+  createdAt    DateTime     @default(now()) @map("created_at")
+  updatedAt    DateTime     @default(now()) @updatedAt @map("updated_at")
+
+  category KbCategory? @relation(fields: [categoryId], references: [id], onDelete: SetNull)
+  author   User?       @relation(fields: [authorId], references: [id], onDelete: SetNull)
+
+  @@index([status, visibility])
+  @@map("kb_articles")
 }
 
 model CannedResponse {

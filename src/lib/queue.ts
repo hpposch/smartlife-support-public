@@ -42,7 +42,8 @@ function createQueues() {
 
 export type NotifyJob =
   | { kind: "ticket_confirmation"; ticketId: string }
-  | { kind: "agent_new_message"; ticketId: string; messageId: string };
+  | { kind: "agent_new_message"; ticketId: string; messageId: string }
+  | { kind: "portal_login"; contactId: string; token: string };
 
 export function queues() {
   if (!globalThis.__queues) globalThis.__queues = createQueues();

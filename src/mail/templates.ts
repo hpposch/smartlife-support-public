@@ -29,6 +29,21 @@ export function ticketConfirmation(t: TicketInfo) {
   };
 }
 
+export function portalLogin(contactName: string | null, loginUrl: string) {
+  const greeting = contactName ? `Hallo ${contactName},` : "Hallo,";
+  return {
+    subject: "Ihr Anmeldelink für das SmartLife-Supportportal",
+    html: layout(
+      `<p>${greeting}</p>
+       <p>mit diesem Link melden Sie sich im Supportportal an (30 Minuten gültig):</p>
+       <p><a href="${loginUrl}">Jetzt anmelden</a></p>
+       <p>Falls Sie diese E-Mail nicht angefordert haben, können Sie sie ignorieren.</p>
+       <p>Ihr SmartLife-Support-Team</p>`
+    ),
+    text: `${greeting}\n\nmit diesem Link melden Sie sich im Supportportal an (30 Minuten gültig):\n\n${loginUrl}\n\nFalls Sie diese E-Mail nicht angefordert haben, können Sie sie ignorieren.\n\nIhr SmartLife-Support-Team`,
+  };
+}
+
 export function agentNewMessage(t: TicketInfo, preview: string) {
   const url = `${env.appUrl}/tickets/by-number/${t.number}`;
   return {

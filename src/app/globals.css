@@ -34,4 +34,24 @@ body {
 .email-body a {
   @apply text-blue-600 underline;
 }
+
+/* Wissensdatenbank-Artikel (gerendertes Markdown) */
+.kb-article {
+  @apply text-[15px] leading-relaxed text-slate-700;
+}
+.kb-article h1 { @apply mt-8 mb-3 text-xl font-semibold text-slate-900; }
+.kb-article h2 { @apply mt-8 mb-3 text-lg font-semibold text-slate-900; }
+.kb-article h3 { @apply mt-6 mb-2 text-base font-semibold text-slate-900; }
+.kb-article p { @apply mb-4; }
+.kb-article a { @apply text-blue-600 underline; }
+.kb-article ul { @apply mb-4 list-disc pl-6; }
+.kb-article ol { @apply mb-4 list-decimal pl-6; }
+.kb-article li { @apply mb-1; }
+.kb-article code { @apply rounded bg-slate-100 px-1 py-0.5 text-[13px]; }
+.kb-article pre { @apply mb-4 overflow-x-auto rounded-lg bg-slate-900 p-4 text-sm text-slate-100; }
+.kb-article pre code { @apply bg-transparent p-0 text-inherit; }
+.kb-article blockquote { @apply mb-4 border-l-2 border-slate-300 pl-4 text-slate-500; }
+.kb-article img { @apply max-w-full rounded-lg; }
+.kb-article table { @apply mb-4 w-full border-collapse text-sm; }
+.kb-article th, .kb-article td { @apply border border-slate-200 px-3 py-1.5 text-left; }
 }
