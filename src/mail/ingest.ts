@@ -12,7 +12,7 @@ import { readStoredFile, storeFile } from "@/lib/storage";
 import { cleanSubject, parseSubjectTag } from "@/lib/ticket-token";
 import { findOrCreateContact } from "@/server/contacts";
 import { addCustomerMessage } from "@/server/messages";
-import { createTicket, enqueueTicketConfirmation } from "@/server/tickets";
+import { createTicket, enqueueTicketConfirmation, finalizeNewTicket } from "@/server/tickets";
 
 function firstAddress(addr: AddressObject | AddressObject[] | undefined) {
   const obj = Array.isArray(addr) ? addr[0] : addr;
@@ -161,9 +161,11 @@ export async function ingestEmail(mailbox: Mailbox, rawEmlKey: string): Promise<
     });
   }
 
-  // Bestätigung nur bei neuem Ticket und nicht auf Auto-Mails (Loop-Schutz)
-  if (isNewTicket && !autoReply) {
-    await enqueueTicketConfirmation(ticket.id);
+  if (isNewTicket) {
+    // Erstellungsregeln + SLA-Zuordnung + Webhook (nach der ersten Nachricht)
+    await finalizeNewTicket(ticket.id);
+    // Bestätigung nicht auf Auto-Mails (Loop-Schutz)
+    if (!autoReply) await enqueueTicketConfirmation(ticket.id);
   }
 }
 

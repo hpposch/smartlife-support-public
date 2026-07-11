@@ -91,10 +91,11 @@ export async function sendAgentReply(messageId: string): Promise<void> {
   }
 }
 
-/** Benachrichtigungs-Mails (Bestätigung, Agenten-Hinweis, Portal-Login). */
+/** Benachrichtigungs-Mails (Bestätigung, Agenten-Hinweis, Portal-Login, CSAT, SLA). */
 export async function sendNotification(
   job:
-    | { kind: "ticket_confirmation" | "agent_new_message"; ticketId: string; messageId?: string }
+    | { kind: "ticket_confirmation" | "agent_new_message" | "csat"; ticketId: string; messageId?: string }
+    | { kind: "sla_breach"; ticketId: string; target: "first_response" | "resolution" }
     | { kind: "portal_login"; contactId: string; token: string }
 ): Promise<void> {
   if (job.kind === "portal_login") {
@@ -146,6 +147,61 @@ export async function sendNotification(
         emailTo: [ticket.contact.email],
         sendStatus: "sent",
       },
+    });
+    return;
+  }
+
+  if (job.kind === "csat") {
+    if (ticket.contact.isBlocked) return;
+    const survey = await db.csatSurvey.findUnique({ where: { ticketId: ticket.id } });
+    if (!survey || survey.answeredAt) return;
+    const tpl = templates.csatSurvey(
+      {
+        number: ticket.number,
+        token: ticket.token,
+        subject: ticket.subject,
+        contactName: ticket.contact.name,
+      },
+      survey.token
+    );
+    await smtpTransport(mailbox).sendMail({
+      from: { name: "SmartLife Support", address: mailbox.address },
+      to: ticket.contact.email,
+      subject: tpl.subject,
+      html: tpl.html,
+      text: tpl.text,
+    });
+    return;
+  }
+
+  if (job.kind === "sla_breach") {
+    // Zugewiesenen Agenten informieren, sonst alle Teamleitungen/Admins
+    const recipients: string[] = [];
+    if (ticket.assigneeId) {
+      const assignee = await db.user.findUnique({ where: { id: ticket.assigneeId } });
+      if (assignee?.isActive) recipients.push(assignee.email);
+    }
+    if (recipients.length === 0) {
+      const leads = await db.user.findMany({
+        where: { isActive: true, role: { in: ["team_lead", "admin"] } },
+      });
+      recipients.push(...leads.map((l) => l.email));
+    }
+    if (recipients.length === 0) return;
+    const label = job.target === "first_response" ? "Erstreaktion" : "Lösung";
+    const dueAt =
+      job.target === "first_response" ? ticket.firstResponseDueAt : ticket.resolutionDueAt;
+    const tpl = templates.slaBreach(
+      { number: ticket.number, token: ticket.token, subject: ticket.subject },
+      label,
+      dueAt ?? new Date()
+    );
+    await smtpTransport(mailbox).sendMail({
+      from: { name: "SmartLife Support", address: mailbox.address },
+      to: recipients,
+      subject: tpl.subject,
+      html: tpl.html,
+      text: tpl.text,
     });
     return;
   }

@@ -217,15 +217,24 @@ model Ticket {
   createdAt      DateTime  @default(now()) @map("created_at")
   updatedAt      DateTime  @default(now()) @updatedAt @map("updated_at")
 
+  // SLA (Phase 3): Fristen laufen in Geschäftszeiten, pausieren bei "Wartet auf Kunde"
+  slaPolicyId        String?   @map("sla_policy_id")
+  firstResponseDueAt DateTime? @map("first_response_due_at")
+  resolutionDueAt    DateTime? @map("resolution_due_at")
+  slaPausedAt        DateTime? @map("sla_paused_at")
+
   contact      Contact         @relation(fields: [contactId], references: [id])
   organization Organization?   @relation(fields: [organizationId], references: [id], onDelete: SetNull)
   assignee     User?           @relation(fields: [assigneeId], references: [id], onDelete: SetNull)
   team         Team?           @relation(fields: [teamId], references: [id], onDelete: SetNull)
   mailbox      Mailbox?        @relation(fields: [mailboxId], references: [id], onDelete: SetNull)
   category     TicketCategory? @relation(fields: [categoryId], references: [id], onDelete: SetNull)
+  slaPolicy    SlaPolicy?      @relation(fields: [slaPolicyId], references: [id], onDelete: SetNull)
   messages     Message[]
   tags         TicketTag[]
   events       TicketEvent[]
+  slaEvents    SlaEvent[]
+  csatSurvey   CsatSurvey?
 
   @@index([status, teamId, updatedAt(sort: Desc)])
   @@index([assigneeId, status])
@@ -344,6 +353,96 @@ model KbArticle {
 
   @@index([status, visibility])
   @@map("kb_articles")
+}
+
+// ---------------------------------------------------------------------------
+// Phase 3: SLA, Automatisierung, CSAT, Webhooks
+// ---------------------------------------------------------------------------
+
+model BusinessHours {
+  id       String   @id @default(uuid())
+  name     String
+  timezone String   @default("Europe/Vienna")
+  // { "mon": [["09:00","17:00"]], "tue": ..., ... } — fehlender Tag = frei
+  schedule Json
+  // Feiertage als "YYYY-MM-DD"
+  holidays String[] @default([])
+
+  policies SlaPolicy[]
+
+  @@map("business_hours")
+}
+
+model SlaPolicy {
+  id              String  @id @default(uuid())
+  name            String
+  // { "channels": [...], "categoryIds": [...], "organizationIds": [...] } — leer = passt immer
+  conditions      Json    @default("{}")
+  // je Priorität Minuten: { "urgent": { "firstResponseMin": 60, "resolutionMin": 480 }, ... }
+  targets         Json
+  businessHoursId String? @map("business_hours_id")
+  // erste passende Richtlinie (kleinste Position) gewinnt
+  position        Int     @default(0)
+  isActive        Boolean @default(true) @map("is_active")
+
+  businessHours BusinessHours? @relation(fields: [businessHoursId], references: [id], onDelete: SetNull)
+  tickets       Ticket[]
+
+  @@map("sla_policies")
+}
+
+model SlaEvent {
+  id         String   @id @default(uuid())
+  ticketId   String   @map("ticket_id")
+  target     String // first_response | resolution
+  outcome    String // met | breached
+  dueAt      DateTime @map("due_at")
+  occurredAt DateTime @default(now()) @map("occurred_at")
+
+  ticket Ticket @relation(fields: [ticketId], references: [id], onDelete: Cascade)
+
+  @@unique([ticketId, target])
+  @@map("sla_events")
+}
+
+model AutomationRule {
+  id         String   @id @default(uuid())
+  name       String
+  trigger    String // ticket_created | time_based
+  conditions Json     @default("{}")
+  actions    Json     @default("{}")
+  position   Int      @default(0)
+  isActive   Boolean  @default(true) @map("is_active")
+  createdAt  DateTime @default(now()) @map("created_at")
+
+  @@map("automation_rules")
+}
+
+model CsatSurvey {
+  id         String    @id @default(uuid())
+  ticketId   String    @unique @map("ticket_id")
+  token      String    @unique
+  rating     Int?
+  comment    String?
+  sentAt     DateTime  @default(now()) @map("sent_at")
+  answeredAt DateTime? @map("answered_at")
+
+  ticket Ticket @relation(fields: [ticketId], references: [id], onDelete: Cascade)
+
+  @@map("csat_surveys")
+}
+
+model Webhook {
+  id           String   @id @default(uuid())
+  url          String
+  // z. B. ["ticket.created", "ticket.replied", "ticket.resolved", "ticket.closed"]
+  events       String[]
+  secret       String
+  isActive     Boolean  @default(true) @map("is_active")
+  failureCount Int      @default(0) @map("failure_count")
+  createdAt    DateTime @default(now()) @map("created_at")
+
+  @@map("webhooks")
 }
 
 model CannedResponse {

@@ -7,7 +7,7 @@ import { db } from "@/lib/db";
 import { env } from "@/lib/env";
 import { textToHtml } from "@/lib/sanitize";
 import { findOrCreateContact } from "@/server/contacts";
-import { createTicket, enqueueTicketConfirmation } from "@/server/tickets";
+import { createTicket, enqueueTicketConfirmation, finalizeNewTicket } from "@/server/tickets";
 
 function authorized(request: NextRequest): boolean {
   const configured = env.apiKey;
@@ -71,6 +71,7 @@ export async function POST(request: NextRequest) {
       bodyHtml: textToHtml(input.body),
     },
   });
+  await finalizeNewTicket(ticket.id);
   if (input.send_confirmation) await enqueueTicketConfirmation(ticket.id);
 
   return NextResponse.json(

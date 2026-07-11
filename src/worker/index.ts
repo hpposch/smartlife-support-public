@@ -7,6 +7,9 @@ import { ingestEmail } from "@/mail/ingest";
 import { pollAllMailboxes } from "@/mail/poll";
 import { sendAgentReply, sendNotification } from "@/mail/send";
 import { createBackup } from "@/server/backup";
+import { runTimeBasedRules } from "@/server/automation";
+import { checkSlaBreaches } from "@/server/sla";
+import { deliverWebhook } from "@/server/webhooks";
 
 const connection = createRedis();
 const POLL_INTERVAL_MS = Number(process.env.MAIL_POLL_INTERVAL_MS ?? 60_000);
@@ -16,6 +19,8 @@ async function main() {
   // Wiederkehrende Jobs (ein Scheduler-Eintrag je Job, überlebt Neustarts)
   await queues().mailPoll.upsertJobScheduler("poll-all", { every: POLL_INTERVAL_MS });
   await queues().backup.upsertJobScheduler("daily-backup", { pattern: BACKUP_CRON });
+  await queues().slaCheck.upsertJobScheduler("sla-check", { every: 5 * 60_000 });
+  await queues().timeRules.upsertJobScheduler("time-rules", { every: 15 * 60_000 });
 
   const workers = [
     new Worker(
@@ -62,6 +67,32 @@ async function main() {
         );
       },
       { connection, concurrency: 1 }
+    ),
+
+    new Worker(
+      "sla-check",
+      async () => {
+        const escalated = await checkSlaBreaches();
+        if (escalated > 0) console.log(`[sla] ${escalated} Verletzung(en) eskaliert`);
+      },
+      { connection, concurrency: 1 }
+    ),
+
+    new Worker(
+      "time-rules",
+      async () => {
+        const changed = await runTimeBasedRules();
+        if (changed > 0) console.log(`[automation] ${changed} Ticket(s) durch Zeitregeln geändert`);
+      },
+      { connection, concurrency: 1 }
+    ),
+
+    new Worker<{ webhookId: string; body: string }>(
+      "webhook",
+      async (job) => {
+        await deliverWebhook(job.data.webhookId, job.data.body);
+      },
+      { connection, concurrency: 4 }
     ),
   ];
 

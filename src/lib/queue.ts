@@ -37,13 +37,24 @@ function createQueues() {
       connection,
       defaultJobOptions: { attempts: 2, backoff: { type: "exponential", delay: 60000 } },
     }),
+    /** SLA-Eskalationslauf (alle 5 min) */
+    slaCheck: new Queue("sla-check", { connection }),
+    /** Zeitgesteuerte Automatisierungsregeln (alle 15 min) */
+    timeRules: new Queue("time-rules", { connection }),
+    /** Ausgehende Webhooks (signierte POSTs) */
+    webhook: new Queue<{ webhookId: string; body: string }>("webhook", {
+      connection,
+      defaultJobOptions: { attempts: 3, backoff: { type: "exponential", delay: 30000 } },
+    }),
   };
 }
 
 export type NotifyJob =
   | { kind: "ticket_confirmation"; ticketId: string }
   | { kind: "agent_new_message"; ticketId: string; messageId: string }
-  | { kind: "portal_login"; contactId: string; token: string };
+  | { kind: "portal_login"; contactId: string; token: string }
+  | { kind: "csat"; ticketId: string }
+  | { kind: "sla_breach"; ticketId: string; target: "first_response" | "resolution" };
 
 export function queues() {
   if (!globalThis.__queues) globalThis.__queues = createQueues();

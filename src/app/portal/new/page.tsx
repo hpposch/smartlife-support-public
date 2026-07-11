@@ -3,7 +3,7 @@ import { z } from "zod";
 import { db } from "@/lib/db";
 import { requireContact } from "@/lib/portal-session";
 import { textToHtml } from "@/lib/sanitize";
-import { createTicket, enqueueTicketConfirmation } from "@/server/tickets";
+import { createTicket, enqueueTicketConfirmation, finalizeNewTicket } from "@/server/tickets";
 
 const schema = z.object({
   subject: z.string().min(3).max(500),
@@ -38,6 +38,7 @@ async function createPortalTicket(formData: FormData) {
       bodyHtml: textToHtml(input.body),
     },
   });
+  await finalizeNewTicket(ticket.id);
   await enqueueTicketConfirmation(ticket.id);
   redirect(`/portal/tickets/${ticket.id}`);
 }

@@ -26,6 +26,13 @@ export async function requireAdmin() {
   return user;
 }
 
+/** Für Berichte: Teamleitung oder Admin. */
+export async function requireLead() {
+  const user = await requireUser();
+  if (user.role !== "admin" && user.role !== "team_lead") redirect("/tickets");
+  return user;
+}
+
 export async function verifyCredentials(email: string, password: string) {
   const user = await db.user.findUnique({ where: { email: email.toLowerCase().trim() } });
   if (!user || !user.isActive || !user.passwordHash) return null;

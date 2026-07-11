@@ -64,6 +64,7 @@ export async function addAgentReply(params: {
   await createAttachments(message.id, params.files ?? []);
 
   const status = params.setStatus ?? "pending_customer";
+  const isFirstReply = !ticket.firstRepliedAt;
   await db.$transaction([
     db.ticket.update({
       where: { id: ticket.id },
@@ -82,6 +83,21 @@ export async function addAgentReply(params: {
       },
     }),
   ]);
+
+  // Phase 3: SLA-Ereignisse, Uhr-Pausierung, CSAT und Webhooks
+  {
+    const { recordFirstResponse, recordResolution, handleSlaStatusChange } = await import("./sla");
+    const { emitWebhookEvent } = await import("./webhooks");
+    const { enqueueCsatSurvey } = await import("./tickets");
+    if (isFirstReply) await recordFirstResponse(ticket.id);
+    await handleSlaStatusChange(ticket.id, ticket.status, status);
+    if (status === "resolved") {
+      await recordResolution(ticket.id);
+      await enqueueCsatSurvey(ticket.id);
+      await emitWebhookEvent("ticket.resolved", ticket.id);
+    }
+    await emitWebhookEvent("ticket.replied", ticket.id);
+  }
 
   await queues().emailSend.add("send", { messageId: message.id });
   return message;
@@ -159,6 +175,9 @@ export async function addCustomerMessage(params: {
         },
       }),
     ]);
+    // SLA-Uhr läuft weiter (Fristen um die Wartezeit verschoben)
+    const { handleSlaStatusChange } = await import("./sla");
+    await handleSlaStatusChange(ticket.id, ticket.status, "open");
   } else {
     await db.ticket.update({ where: { id: ticket.id }, data: { updatedAt: new Date() } });
   }

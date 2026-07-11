@@ -39,4 +39,8 @@ jobs:
       - run: npm test
       - name: End-to-End-Rauchtest der E-Mail-Pipeline
         run: npm run smoke
+      - name: End-to-End-Rauchtest SLA/Automatisierung/CSAT/Webhooks
+        run: npx tsx scripts/smoke-phase3.ts
+        env:
+          CSAT_ENABLED: "true"
       - run: npm run build

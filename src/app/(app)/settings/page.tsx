@@ -7,6 +7,9 @@ const SECTIONS = [
   { href: "/settings/categories", title: "Kategorien", desc: "Ticket-Kategorien pflegen" },
   { href: "/settings/canned", title: "Textbausteine", desc: "Vordefinierte Antworten mit Platzhaltern" },
   { href: "/settings/kb", title: "Wissensdatenbank", desc: "Artikel und Kategorien für das Hilfe-Center" },
+  { href: "/settings/sla", title: "SLA & Geschäftszeiten", desc: "Reaktions- und Lösungsfristen, Feiertage" },
+  { href: "/settings/automation", title: "Automatisierung", desc: "Erstellungs- und Zeitregeln, Auto-Zuweisung" },
+  { href: "/settings/webhooks", title: "Webhooks", desc: "Ticket-Ereignisse an externe Systeme senden" },
   { href: "/settings/backups", title: "Backups", desc: "Automatische Sicherungen als eine Datei, Download & Wiederherstellung" },
 ];
 

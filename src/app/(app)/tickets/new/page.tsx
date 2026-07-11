@@ -5,7 +5,7 @@ import { db } from "@/lib/db";
 import { PRIORITY_LABELS } from "@/lib/labels";
 import { findOrCreateContact } from "@/server/contacts";
 import { addInternalNote } from "@/server/messages";
-import { createTicket } from "@/server/tickets";
+import { createTicket, finalizeNewTicket } from "@/server/tickets";
 
 const schema = z.object({
   email: z.string().email("Gültige Kunden-E-Mail angeben"),
@@ -42,6 +42,7 @@ async function createManualTicket(formData: FormData) {
   );
   // Erstinhalt (z. B. Telefonnotiz) als interne Notiz erfassen
   await addInternalNote({ ticketId: ticket.id, userId: user.id, bodyText: input.body });
+  await finalizeNewTicket(ticket.id);
 
   redirect(`/tickets/${ticket.id}`);
 }

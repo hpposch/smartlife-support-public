@@ -55,8 +55,15 @@ Die Entscheidung für den Eigenbau ist dann sinnvoll, wenn tiefe Produktintegrat
 
 - ✅ Kundenportal unter `/portal`: Login mit dem **Azure-AD-B2C-Kundenkonto** (OpenID Connect, Authorization Code Flow + PKCE); Kontakte werden über die B2C-Objekt-ID stabil verknüpft, bestehende Kontakte per E-Mail-Abgleich übernommen. Ohne B2C-Konfiguration (oder zusätzlich per `PORTAL_MAGIC_LINK=true`): passwortloser Magic-Link-Login. Eigene Anfragen einsehen/beantworten/schließen, neue Anfrage per Formular — strikt auf den eigenen Kontakt beschränkt
 - ✅ Hilfe-Center unter `/kb`: öffentliche Wissensdatenbank mit Kategorien, Suche und Markdown-Artikeln; Sichtbarkeit pro Artikel (öffentlich / nur Kunden / intern); Pflege unter *Verwaltung → Wissensdatenbank*
-- ⬜ Restliche P2-Punkte: Custom Fields, gespeicherte Ansichten, Merge, Kollisionserkennung, Basis-Dashboard, Englisch
-- ⬜ Phase 3–4: SLA, Automatisierung, Reporting, KI (siehe Roadmap)
+**Phase 3 (SLA, Automatisierung, Reporting) ist implementiert:**
+
+- ✅ **SLA:** Geschäftszeiten-Kalender (Zeitzone, Feiertage), SLA-Richtlinien mit Zielen je Priorität (Erstreaktion/Lösung), Fristen laufen nur in Geschäftszeiten, Uhr pausiert bei „Wartet auf Kunde“, Eskalation bei Verletzung (System-Notiz + E-Mail an Agent/Teamleitung), Anzeige in Liste und Detail
+- ✅ **Automatisierung:** Erstellungsregeln (Kanal/Betreff → Priorität, Kategorie, Team, Tags, Zuweisung inkl. Round-Robin) und Zeitregeln (z. B. „Gelöst + 5 Tage → automatisch schließen“)
+- ✅ **CSAT:** Bewertungs-Mail (1–5) nach Lösung, öffentliche Bewertungsseite, Auswertung im Reporting (`CSAT_ENABLED=true`)
+- ✅ **Reporting** unter `/reports` (Teamleitung/Admin): Kennzahlen, SLA-Quoten, CSAT, nach Kategorie/Agent, Tagesverlauf, CSV-Export
+- ✅ **Webhooks:** signierte POSTs (`X-Signature`, HMAC-SHA256) bei `ticket.created/replied/resolved/closed`, Retry + Auto-Deaktivierung
+- ⬜ Restliche P2/P3-Punkte: Custom Fields, gespeicherte Ansichten, Merge, Kollisionserkennung, Makros, Englisch
+- ⬜ Phase 4: KI-Unterstützung (siehe Roadmap)
 
 ## Entwicklung starten
 

@@ -115,7 +115,50 @@ export async function updateTicket(ticketId: string, input: TicketUpdateInput, a
     db.ticket.update({ where: { id: ticketId }, data }),
     db.ticketEvent.createMany({ data: events }),
   ]);
+
+  // Phase 3: SLA-Uhr, SLA-Ereignisse, CSAT und Webhooks an Statuswechsel koppeln
+  const { handleSlaStatusChange, recordResolution, applySla } = await import("./sla");
+  const { emitWebhookEvent } = await import("./webhooks");
+  if (input.status !== undefined && input.status !== ticket.status) {
+    await handleSlaStatusChange(ticketId, ticket.status, input.status);
+    if (input.status === "resolved") {
+      await recordResolution(ticketId);
+      await enqueueCsatSurvey(ticketId);
+      await emitWebhookEvent("ticket.resolved", ticketId);
+    }
+    if (input.status === "closed") await emitWebhookEvent("ticket.closed", ticketId);
+  }
+  if (input.priority !== undefined && input.priority !== ticket.priority) {
+    await applySla(ticketId); // Fristen an neue Priorität anpassen
+  }
+
   return updated;
+}
+
+/**
+ * Nach der Erstellung (erste Nachricht liegt vor): Erstellungsregeln,
+ * SLA-Zuordnung und Webhook — in dieser Reihenfolge, damit Regeln Priorität/
+ * Kategorie noch beeinflussen, bevor die Fristen berechnet werden.
+ */
+export async function finalizeNewTicket(ticketId: string): Promise<void> {
+  const { runCreationRules } = await import("./automation");
+  const { applySla } = await import("./sla");
+  const { emitWebhookEvent } = await import("./webhooks");
+  await runCreationRules(ticketId);
+  await applySla(ticketId);
+  await emitWebhookEvent("ticket.created", ticketId);
+}
+
+/** CSAT-Umfrage anlegen und versenden (einmal pro Ticket, nur wenn aktiviert). */
+export async function enqueueCsatSurvey(ticketId: string): Promise<void> {
+  if (process.env.CSAT_ENABLED !== "true") return;
+  const existing = await db.csatSurvey.findUnique({ where: { ticketId } });
+  if (existing) return;
+  const { randomBytes } = await import("node:crypto");
+  await db.csatSurvey.create({
+    data: { ticketId, token: randomBytes(24).toString("base64url") },
+  });
+  await queues().notify.add("csat", { kind: "csat", ticketId });
 }
 
 export async function setTicketTags(ticketId: string, tagNames: string[], actor: Actor) {

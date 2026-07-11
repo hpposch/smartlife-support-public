@@ -27,6 +27,11 @@ export default async function AppLayout({ children }: { children: React.ReactNod
             <Link href="/tickets/new" className="hover:text-slate-900">
               Neues Ticket
             </Link>
+            {(user.role === "admin" || user.role === "team_lead") && (
+              <Link href="/reports" className="hover:text-slate-900">
+                Berichte
+              </Link>
+            )}
             {user.role === "admin" && (
               <Link href="/settings" className="hover:text-slate-900">
                 Verwaltung

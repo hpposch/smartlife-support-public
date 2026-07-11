@@ -11,6 +11,17 @@ import {
 import { ReplyBox } from "./reply-box";
 import { updateTicketProperties } from "./actions";
 
+function SlaDue({ dueAt, done, paused }: { dueAt: Date; done: boolean; paused: boolean }) {
+  if (done) return <span className="text-emerald-600">erfüllt</span>;
+  const overdue = !paused && dueAt < new Date();
+  return (
+    <span className={overdue ? "font-medium text-red-600" : "text-slate-700"}>
+      {overdue ? "überfällig seit " : "fällig "}
+      {formatDateTime(dueAt)}
+    </span>
+  );
+}
+
 const MESSAGE_STYLES: Record<string, { label: string; frame: string; badge: string }> = {
   customer: { label: "Kunde", frame: "border-slate-200 bg-white", badge: "bg-slate-100 text-slate-700" },
   agent_reply: { label: "Antwort", frame: "border-blue-200 bg-blue-50/40", badge: "bg-blue-100 text-blue-700" },
@@ -221,6 +232,37 @@ export default async function TicketDetailPage({
             Speichern
           </button>
         </form>
+
+        {(ticket.firstResponseDueAt || ticket.resolutionDueAt) && (
+          <div className="rounded-lg border border-slate-200 bg-white p-4 shadow-sm">
+            <h2 className="mb-2 text-sm font-semibold">SLA</h2>
+            <ul className="space-y-1.5 text-sm">
+              {ticket.firstResponseDueAt && (
+                <li className="flex justify-between">
+                  <span className="text-slate-500">Erstreaktion</span>
+                  <SlaDue
+                    dueAt={ticket.firstResponseDueAt}
+                    done={!!ticket.firstRepliedAt}
+                    paused={!!ticket.slaPausedAt}
+                  />
+                </li>
+              )}
+              {ticket.resolutionDueAt && (
+                <li className="flex justify-between">
+                  <span className="text-slate-500">Lösung</span>
+                  <SlaDue
+                    dueAt={ticket.resolutionDueAt}
+                    done={!!ticket.resolvedAt}
+                    paused={!!ticket.slaPausedAt}
+                  />
+                </li>
+              )}
+              {ticket.slaPausedAt && (
+                <li className="text-xs text-slate-400">Uhr pausiert (wartet auf Kunde/gelöst)</li>
+              )}
+            </ul>
+          </div>
+        )}
 
         <div className="rounded-lg border border-slate-200 bg-white p-4 shadow-sm">
           <h2 className="mb-2 text-sm font-semibold">Kunde</h2>

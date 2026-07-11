@@ -12,6 +12,21 @@ import {
 
 const PAGE_SIZE = 50;
 
+function isSlaOverdue(ticket: {
+  firstResponseDueAt: Date | null;
+  resolutionDueAt: Date | null;
+  firstRepliedAt: Date | null;
+  resolvedAt: Date | null;
+  slaPausedAt: Date | null;
+  status: string;
+}): boolean {
+  if (ticket.slaPausedAt || ticket.status === "resolved" || ticket.status === "closed") return false;
+  const now = new Date();
+  if (ticket.firstResponseDueAt && !ticket.firstRepliedAt && ticket.firstResponseDueAt < now) return true;
+  if (ticket.resolutionDueAt && !ticket.resolvedAt && ticket.resolutionDueAt < now) return true;
+  return false;
+}
+
 interface Filters {
   status?: string;
   priority?: string;
@@ -160,6 +175,11 @@ export default async function TicketListPage({
                   >
                     {STATUS_LABELS[ticket.status]}
                   </span>
+                  {isSlaOverdue(ticket) && (
+                    <span className="ml-1.5 rounded-full bg-red-100 px-2 py-0.5 text-xs font-medium text-red-700">
+                      SLA überfällig
+                    </span>
+                  )}
                 </td>
                 <td className={`px-4 py-2.5 text-xs font-medium ${PRIORITY_COLORS[ticket.priority]}`}>
                   {PRIORITY_LABELS[ticket.priority]}

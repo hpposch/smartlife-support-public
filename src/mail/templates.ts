@@ -44,6 +44,42 @@ export function portalLogin(contactName: string | null, loginUrl: string) {
   };
 }
 
+export function csatSurvey(t: TicketInfo, token: string) {
+  const greeting = t.contactName ? `Hallo ${t.contactName},` : "Hallo,";
+  const base = `${env.appUrl}/csat/${token}`;
+  const stars = [1, 2, 3, 4, 5]
+    .map(
+      (n) =>
+        `<a href="${base}?rating=${n}" style="display:inline-block;padding:8px 14px;margin:0 3px;border:1px solid #d1d5db;border-radius:8px;text-decoration:none;color:#1f2937;font-size:18px">${n}</a>`
+    )
+    .join("");
+  return {
+    subject: `Wie zufrieden waren Sie mit unserer Hilfe? (Ticket #${t.number})`,
+    html: layout(
+      `<p>${greeting}</p>
+       <p>Ihre Anfrage <strong>„${t.subject}“</strong> wurde gelöst. Wie zufrieden
+       waren Sie mit unserem Support? (1 = unzufrieden, 5 = sehr zufrieden)</p>
+       <p style="text-align:center;margin:20px 0">${stars}</p>
+       <p>Vielen Dank!<br/>Ihr SmartLife-Support-Team</p>`
+    ),
+    text: `${greeting}\n\nIhre Anfrage „${t.subject}“ wurde gelöst. Wie zufrieden waren Sie mit unserem Support? (1 = unzufrieden, 5 = sehr zufrieden)\n\nBewerten: ${base}\n\nVielen Dank!\nIhr SmartLife-Support-Team`,
+  };
+}
+
+export function slaBreach(t: TicketInfo, targetLabel: string, dueAt: Date) {
+  const url = `${env.appUrl}/tickets/by-number/${t.number}`;
+  return {
+    subject: `⚠ SLA-Verletzung in Ticket #${t.number}: ${targetLabel}`,
+    html: layout(
+      `<p>In Ticket <strong>#${t.number}</strong> („${t.subject}“) wurde das
+       SLA-Ziel <strong>${targetLabel}</strong> verletzt (fällig:
+       ${dueAt.toLocaleString("de-AT", { timeZone: "Europe/Vienna" })}).</p>
+       <p><a href="${url}">Ticket öffnen</a></p>`
+    ),
+    text: `In Ticket #${t.number} („${t.subject}“) wurde das SLA-Ziel ${targetLabel} verletzt (fällig: ${dueAt.toISOString()}).\n\nTicket öffnen: ${url}`,
+  };
+}
+
 export function agentNewMessage(t: TicketInfo, preview: string) {
   const url = `${env.appUrl}/tickets/by-number/${t.number}`;
   return {
