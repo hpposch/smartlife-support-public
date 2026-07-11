@@ -113,7 +113,9 @@ Hinweise für den Betrieb mit Gmail:
 
 ### Wissensdatenbank: Bold-BI-Doku importieren (Rebranding auf smartlife BI)
 
-Importiert alle ~890 Artikel aus [boldbi/bold-bi-docs](https://github.com/boldbi/bold-bi-docs) in das Hilfe-Center — inkl. Bilder, Kategorien und umgeschriebener interner Links. Dabei wird durchgängig **„Bold BI" → „smartlife BI"** und **„Syncfusion" → „smartlife"** ersetzt (anpassbar über die Konstanten am Skriptanfang):
+Importiert alle ~890 Artikel aus [boldbi/bold-bi-docs](https://github.com/boldbi/bold-bi-docs) in das Hilfe-Center — inkl. Bilder, Kategorien und umgeschriebener interner Links. Dabei wird durchgängig **„Bold BI" → „smartlife BI"** und **„Syncfusion" → „smartlife"** ersetzt (anpassbar über die Konstanten am Skriptanfang).
+
+Voraussetzung für den lokalen Lauf: eingerichtete Entwicklungsumgebung (`npm install`, `.env` mit `DATABASE_URL`, laufende Datenbank — s. „Entwicklung starten“). Im All-in-One-Container geht es ohne all das mit einem `docker exec` (s. „Schnelltest“).
 
 ```bash
 git clone --depth 1 https://github.com/boldbi/bold-bi-docs.git /tmp/bold-bi-docs
@@ -173,5 +175,18 @@ docker run -d --name smartlife-support -p 3000:3000 -v smartlife-data:/data \
   -e AI_BASE_URL=https://api.openai.com/v1 -e AI_API_KEY=sk-… -e AI_MODEL=gpt-4o \
   smartlife-support:all-in-one
 ```
+
+**Wissensdatenbank im Container importieren:** Das bold-bi-docs-Repo auf dem Host clonen, beim Start read-only einhängen und den Import im Container ausführen — Rebranding, Link-Umschreibung und Logo-Ersetzung laufen dabei automatisch mit (Python/OpenCV ist im Image enthalten):
+
+```bash
+git clone https://github.com/boldbi/bold-bi-docs.git
+docker run -d --name smartlife-support -p 3000:3000 \
+  -v smartlife-data:/data \
+  -v ./bold-bi-docs:/import/bold-bi-docs:ro \
+  smartlife-support:all-in-one
+docker exec smartlife-support bash docker/import-kb.sh /import/bold-bi-docs
+```
+
+Für Doku-Updates später: `git pull` im bold-bi-docs-Ordner, dann denselben `docker exec`-Befehl erneut (mit `--prune` werden entfallene Artikel gelöscht; ausgeblendete Artikel/Kategorien bleiben ausgeblendet).
 
 Für den Dauerbetrieb ist weiterhin `docker-compose.yml` (getrennte Dienste, getrennte Volumes) die richtige Wahl.

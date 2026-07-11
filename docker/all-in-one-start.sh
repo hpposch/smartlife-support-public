@@ -32,6 +32,18 @@ if [ -z "${SESSION_SECRET:-}" ]; then
   export SESSION_SECRET
 fi
 
+# Effektive Verbindungsdaten für docker-exec-Aufrufe bereitstellen
+# (z. B. docker/import-kb.sh) — exec-Sitzungen erben die Variablen sonst nicht
+umask 077
+cat > /data/app.env <<ENV
+DATABASE_URL='${DATABASE_URL}'
+REDIS_URL='${REDIS_URL}'
+DATA_DIR='${DATA_DIR}'
+BACKUP_DIR='${BACKUP_DIR}'
+APP_URL='${APP_URL}'
+ENV
+umask 022
+
 # --- PostgreSQL ---
 if [ ! -s "$PGDATA/PG_VERSION" ]; then
   echo "Initialisiere PostgreSQL-Datenverzeichnis unter $PGDATA …"
