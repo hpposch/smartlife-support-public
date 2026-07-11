@@ -1,5 +1,7 @@
 import Link from "next/link";
 import { getCurrentContact } from "@/lib/portal-session";
+import { isAiEnabled } from "@/server/ai";
+import { ChatWidget } from "@/components/chat-widget";
 
 export default async function KbLayout({ children }: { children: React.ReactNode }) {
   const contact = await getCurrentContact();
@@ -27,6 +29,7 @@ export default async function KbLayout({ children }: { children: React.ReactNode
         </div>
       </header>
       <main className="mx-auto max-w-4xl px-4 py-8">{children}</main>
+      {isAiEnabled() && <ChatWidget loggedIn={!!contact} />}
     </div>
   );
 }

@@ -2,6 +2,8 @@ import Link from "next/link";
 import { redirect } from "next/navigation";
 import { b2cConfig, logoutUrl } from "@/lib/b2c";
 import { getCurrentContact, getPortalSession } from "@/lib/portal-session";
+import { isAiEnabled } from "@/server/ai";
+import { ChatWidget } from "@/components/chat-widget";
 
 async function portalLogout() {
   "use server";
@@ -53,6 +55,7 @@ export default async function PortalLayout({ children }: { children: React.React
         </div>
       </header>
       <main className="mx-auto max-w-4xl px-4 py-6">{children}</main>
+      {isAiEnabled() && <ChatWidget loggedIn={!!contact} />}
     </div>
   );
 }

@@ -11,7 +11,29 @@ createServer(async (req, res) => {
     const request = JSON.parse(body);
 
     let text: string;
-    if (request.output_config?.format) {
+    const system = String(request.system ?? "");
+    if (system.includes("Chat-Assistent")) {
+      const lastUser = [...(request.messages ?? [])]
+        .reverse()
+        .find((m: { role: string }) => m.role === "user");
+      const userText = JSON.stringify(lastUser?.content ?? "").toLowerCase();
+      const wantsHelp = /problem|fehler|funktioniert nicht|hilfe/.test(userText);
+      text = JSON.stringify(
+        wantsHelp
+          ? {
+              reply:
+                "Das klingt nach einem Problem in Ihrer Umgebung — das prüft am besten unser Support-Team. Soll ich ein Ticket mit unserem Chatverlauf erstellen? [Stub]",
+              offer_ticket: true,
+              suggested_subject: "Problem mit Dashboard-Anzeige",
+            }
+          : {
+              reply:
+                "Ein Dashboard erstellen Sie über den Designer — die Schritte stehen im Artikel [Create Dashboard](/kb/getting-started-creating-dashboard-000000). [Stub]",
+              offer_ticket: false,
+              suggested_subject: null,
+            }
+      );
+    } else if (request.output_config?.format) {
       text = JSON.stringify({ category: "Abrechnung", priority: "high", sentiment: "verärgert" });
     } else if (String(request.system ?? "").includes("entwirfst Antworten")) {
       text =
