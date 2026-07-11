@@ -121,10 +121,17 @@ export async function restoreBackup(filePath: string): Promise<void> {
     await run("tar", ["-xzf", absolute, "-C", tmp]);
     await stat(path.join(tmp, "db.dump")); // Plausibilitätsprüfung
 
-    // --clean --if-exists: vorhandene Objekte werden ersetzt
+    // Schema vollständig leeren: pg_restore --clean entfernt nur Objekte,
+    // die im Dump enthalten sind — Tabellen aus späteren Migrationen blieben
+    // sonst stehen und kollidieren beim nächsten `migrate deploy`.
+    await run("psql", [
+      env.databaseUrl,
+      "-v", "ON_ERROR_STOP=1",
+      "-c", "DROP SCHEMA IF EXISTS public CASCADE",
+      "-c", "CREATE SCHEMA public",
+    ]);
+
     await run("pg_restore", [
-      "--clean",
-      "--if-exists",
       "--no-owner",
       "--dbname",
       env.databaseUrl,

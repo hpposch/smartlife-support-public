@@ -127,6 +127,8 @@ model Contact {
   email          String    @unique
   name           String?
   phone          String?
+  // Objekt-ID (oid/sub) des Kundenkontos in Azure AD B2C — stabile Verknüpfung
+  azureB2cId     String?   @unique @map("azure_b2c_id")
   organizationId String?   @map("organization_id")
   isBlocked      Boolean   @default(false) @map("is_blocked")
   anonymizedAt   DateTime? @map("anonymized_at")

@@ -52,11 +52,19 @@ export default async function PortalLoginPage({
   const contact = await getCurrentContact();
   if (contact) redirect("/portal");
 
+  const { isB2cEnabled } = await import("@/lib/b2c");
+  const b2c = isB2cEnabled();
+  // Magic-Link nur anbieten, wenn kein B2C konfiguriert ist — oder explizit
+  // beides erlaubt wurde (PORTAL_MAGIC_LINK=true)
+  const magicLink = !b2c || process.env.PORTAL_MAGIC_LINK === "true";
+
   return (
     <div className="mx-auto mt-10 max-w-sm rounded-xl border border-slate-200 bg-white p-8 shadow-sm">
       <h1 className="mb-1 text-xl font-semibold">Supportportal</h1>
       <p className="mb-6 text-sm text-slate-500">
-        Geben Sie Ihre E-Mail-Adresse ein — wir senden Ihnen einen Anmeldelink.
+        {b2c
+          ? "Melden Sie sich mit Ihrem SmartLife-Kundenkonto an."
+          : "Geben Sie Ihre E-Mail-Adresse ein — wir senden Ihnen einen Anmeldelink."}
       </p>
       {params.sent && (
         <p className="mb-4 rounded-md bg-emerald-50 px-3 py-2 text-sm text-emerald-700">
@@ -64,24 +72,49 @@ export default async function PortalLoginPage({
           Bitte prüfen Sie Ihr Postfach (Link 30 Minuten gültig).
         </p>
       )}
-      {params.error && (
+      {params.error === "b2c" && (
+        <p className="mb-4 rounded-md bg-red-50 px-3 py-2 text-sm text-red-700">
+          Die Anmeldung war nicht erfolgreich. Bitte versuchen Sie es erneut.
+        </p>
+      )}
+      {params.error && params.error !== "b2c" && (
         <p className="mb-4 rounded-md bg-red-50 px-3 py-2 text-sm text-red-700">
           Der Anmeldelink ist ungültig oder abgelaufen. Bitte fordern Sie einen neuen an.
         </p>
       )}
-      <form action={requestLoginLink} className="space-y-4">
-        <input
-          name="email"
-          type="email"
-          required
-          autoFocus
-          placeholder="ihre@email.de"
-          className="input"
-        />
-        <button type="submit" className="btn-primary w-full justify-center">
-          Anmeldelink senden
-        </button>
-      </form>
+
+      {b2c && (
+        <a href="/portal/auth/b2c/start" className="btn-primary w-full justify-center">
+          Mit Kundenkonto anmelden
+        </a>
+      )}
+
+      {b2c && magicLink && (
+        <div className="my-5 flex items-center gap-3 text-xs text-slate-400">
+          <span className="h-px flex-1 bg-slate-200" />
+          oder per E-Mail-Link
+          <span className="h-px flex-1 bg-slate-200" />
+        </div>
+      )}
+
+      {magicLink && (
+        <form action={requestLoginLink} className="space-y-4">
+          <input
+            name="email"
+            type="email"
+            required
+            autoFocus={!b2c}
+            placeholder="ihre@email.de"
+            className="input"
+          />
+          <button
+            type="submit"
+            className={`${b2c ? "btn-secondary" : "btn-primary"} w-full justify-center`}
+          >
+            Anmeldelink senden
+          </button>
+        </form>
+      )}
     </div>
   );
 }

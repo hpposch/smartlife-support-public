@@ -53,7 +53,7 @@ Die Entscheidung für den Eigenbau ist dann sinnvoll, wenn tiefe Produktintegrat
 
 **Phase 2 (Kundenportal + Wissensdatenbank) ist implementiert:**
 
-- ✅ Kundenportal unter `/portal`: passwortloser Login per Magic-Link (30 min gültig, Einmal-Verwendung, nur Hash in der DB), eigene Anfragen einsehen/beantworten/schließen, neue Anfrage per Formular — strikt auf den eigenen Kontakt beschränkt
+- ✅ Kundenportal unter `/portal`: Login mit dem **Azure-AD-B2C-Kundenkonto** (OpenID Connect, Authorization Code Flow + PKCE); Kontakte werden über die B2C-Objekt-ID stabil verknüpft, bestehende Kontakte per E-Mail-Abgleich übernommen. Ohne B2C-Konfiguration (oder zusätzlich per `PORTAL_MAGIC_LINK=true`): passwortloser Magic-Link-Login. Eigene Anfragen einsehen/beantworten/schließen, neue Anfrage per Formular — strikt auf den eigenen Kontakt beschränkt
 - ✅ Hilfe-Center unter `/kb`: öffentliche Wissensdatenbank mit Kategorien, Suche und Markdown-Artikeln; Sichtbarkeit pro Artikel (öffentlich / nur Kunden / intern); Pflege unter *Verwaltung → Wissensdatenbank*
 - ⬜ Restliche P2-Punkte: Custom Fields, gespeicherte Ansichten, Merge, Kollisionserkennung, Basis-Dashboard, Englisch
 - ⬜ Phase 3–4: SLA, Automatisierung, Reporting, KI (siehe Roadmap)
@@ -74,6 +74,14 @@ npm run worker                # E-Mail-Worker (zweites Terminal)
 Login nach dem Seed: `admin@smartlife.software` / `admin1234` (via `SEED_ADMIN_*` in `.env` änderbar — **vor Produktivbetrieb ändern**).
 
 Postfächer werden unter **Verwaltung → Postfächer** angebunden; das Passwort kommt aus der ENV-Variable, die im Feld `credentialsRef` benannt wird (z. B. `MAILBOX_SUPPORT_PASSWORD`).
+
+### Azure AD B2C für das Kundenportal einrichten
+
+1. Im B2C-Tenant eine **App-Registrierung** (Typ *Web*) anlegen; Redirect-URI: `https://<APP_URL>/portal/auth/b2c/callback`, Client-Secret erzeugen
+2. Im **User-Flow** (z. B. `B2C_1_signin`) unter *Anwendungsansprüche* mindestens **Email Addresses** und **Display Name** aktivieren
+3. In der `.env` setzen: `AZURE_B2C_TENANT`, `AZURE_B2C_POLICY`, `AZURE_B2C_CLIENT_ID`, `AZURE_B2C_CLIENT_SECRET` (Details in `.env.example`)
+
+Beim ersten Login wird das B2C-Konto über seine Objekt-ID mit dem Support-Kontakt verknüpft; existiert bereits ein Kontakt mit derselben E-Mail (z. B. aus früheren E-Mail-Tickets), wird dieser übernommen — die Ticket-Historie bleibt erhalten. Zum lokalen Testen ohne echten Tenant: `npx tsx scripts/b2c-stub.ts` und `AZURE_B2C_AUTHORITY=http://localhost:4444` (s. Skript-Kommentar).
 
 **Tests:** `npm test` (Unit-Tests für Threading/Sanitisierung/Auto-Reply-Erkennung) und `npx tsx scripts/smoke-ingest.ts` (End-to-End-Test der E-Mail-Pipeline gegen DB+Redis).
 

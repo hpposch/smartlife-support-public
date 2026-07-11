@@ -36,3 +36,35 @@ export async function findOrCreateContact(
     },
   });
 }
+
+/**
+ * Kontakt für ein Azure-AD-B2C-Konto auflösen:
+ * 1. bereits verknüpft (azure_b2c_id) → dieser Kontakt
+ * 2. E-Mail bekannt (z. B. aus früheren E-Mail-Tickets) → Konto verknüpfen
+ * 3. sonst neuen Kontakt anlegen (inkl. Organisations-Zuordnung per Domain)
+ */
+export async function findOrCreateB2cContact(
+  db: PrismaClient,
+  profile: { objectId: string; email: string; name: string | null }
+) {
+  const linked = await db.contact.findUnique({ where: { azureB2cId: profile.objectId } });
+  if (linked) {
+    // E-Mail-Änderung in B2C nachziehen, sofern die neue Adresse frei ist
+    if (linked.email !== profile.email) {
+      const emailTaken = await db.contact.findUnique({ where: { email: profile.email } });
+      if (!emailTaken) {
+        return db.contact.update({
+          where: { id: linked.id },
+          data: { email: profile.email, name: linked.name ?? profile.name },
+        });
+      }
+    }
+    return linked;
+  }
+
+  const contact = await findOrCreateContact(db, profile.email, profile.name);
+  return db.contact.update({
+    where: { id: contact.id },
+    data: { azureB2cId: profile.objectId },
+  });
+}

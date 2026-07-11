@@ -1,11 +1,18 @@
 import Link from "next/link";
 import { redirect } from "next/navigation";
+import { b2cConfig, logoutUrl } from "@/lib/b2c";
 import { getCurrentContact, getPortalSession } from "@/lib/portal-session";
 
 async function portalLogout() {
   "use server";
   const session = await getPortalSession();
   session.destroy();
+  // Bei B2C zusätzlich die SSO-Session dort beenden
+  const config = b2cConfig();
+  if (config) {
+    const url = await logoutUrl(config).catch(() => null);
+    if (url) redirect(url);
+  }
   redirect("/portal/login");
 }
 
