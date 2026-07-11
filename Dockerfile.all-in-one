@@ -1,0 +1,46 @@
+# All-in-One-Image zum schnellen Testen: App, Worker, PostgreSQL 16 und Redis
+# in EINEM Container. Alle Daten (DB, Anhänge, Backups) liegen unter /data.
+#
+#   docker build -f Dockerfile.all-in-one -t smartlife-support:all-in-one .
+#   docker run -d --name smartlife-support -p 3000:3000 \
+#     -v smartlife-data:/data smartlife-support:all-in-one
+#
+# Login danach: admin@smartlife.software / admin1234 (per SEED_ADMIN_* änderbar).
+# Für den Produktivbetrieb ist docker-compose.yml (getrennte Dienste) gedacht.
+FROM node:22-slim AS base
+# PostgreSQL 16 (Server + Client) aus dem PGDG-Repo, Redis aus Debian
+RUN apt-get update \
+    && apt-get install -y --no-install-recommends openssl curl ca-certificates gnupg \
+    && curl -fsSL https://www.postgresql.org/media/keys/ACCC4CF8.asc \
+       | gpg --dearmor -o /etc/apt/trusted.gpg.d/pgdg.gpg \
+    && echo "deb http://apt.postgresql.org/pub/repos/apt bookworm-pgdg main" \
+       > /etc/apt/sources.list.d/pgdg.list \
+    && apt-get update \
+    && apt-get install -y --no-install-recommends postgresql-16 postgresql-client-16 redis-server \
+    && rm -rf /var/lib/apt/lists/* \
+    # das vom Paket automatisch angelegte Cluster wird nicht genutzt (PGDATA liegt in /data)
+    && rm -rf /var/lib/postgresql/16/main
+WORKDIR /app
+
+FROM base AS deps
+COPY package.json package-lock.json ./
+COPY prisma ./prisma
+RUN npm ci
+
+FROM deps AS build
+COPY . .
+RUN npx prisma generate && npm run build
+
+FROM base AS runtime
+ENV NODE_ENV=production
+COPY --from=deps /app/node_modules ./node_modules
+COPY --from=build /app/.next ./.next
+COPY --from=build /app/public ./public
+COPY . .
+RUN npx prisma generate && chmod +x docker/all-in-one-start.sh
+
+VOLUME /data
+EXPOSE 3000
+HEALTHCHECK --interval=30s --timeout=5s --start-period=60s --retries=3 \
+  CMD curl -fsS http://localhost:3000/api/health || exit 1
+CMD ["bash", "docker/all-in-one-start.sh"]

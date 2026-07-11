@@ -1,0 +1,15 @@
+# Nicht ins Docker-Image kopieren: Abhängigkeiten/Builds entstehen im Build,
+# lokale Daten und Geheimnisse gehören nie ins Image
+node_modules
+.next
+.git
+.env
+.env.*
+!.env.example
+data
+backups
+dump.rdb
+*.log
+tsconfig.tsbuildinfo
+.github
+docs

@@ -154,3 +154,24 @@ Beim ersten Login wird das B2C-Konto über seine Objekt-ID mit dem Support-Konta
 **Tests:** `npm test` (Unit-Tests für Threading/Sanitisierung/Auto-Reply-Erkennung) und `npx tsx scripts/smoke-ingest.ts` (End-to-End-Test der E-Mail-Pipeline gegen DB+Redis).
 
 **Produktion:** `docker compose up -d --build` — startet Web, Worker, PostgreSQL und Redis; davor `.env` mit echten Secrets füllen. TLS/Reverse-Proxy (z. B. Caddy) je nach Server-Setup davorschalten.
+
+## Schnelltest: alles in einem Container
+
+Zum schnellen Ausprobieren gibt es ein All-in-One-Image (`Dockerfile.all-in-one`), das App, Worker, PostgreSQL 16 und Redis in **einem** Container bündelt — ohne `.env`, ohne Compose:
+
+```bash
+docker build -f Dockerfile.all-in-one -t smartlife-support:all-in-one .
+docker run -d --name smartlife-support -p 3000:3000 \
+  -v smartlife-data:/data smartlife-support:all-in-one
+```
+
+Danach läuft alles auf http://localhost:3000 — Login: `admin@smartlife.software` / `admin1234`. Beim ersten Start werden Datenbank, Schema und Grunddaten automatisch angelegt; ein `SESSION_SECRET` wird erzeugt und im Volume abgelegt. Alle Daten (Datenbank, Anhänge, Backups) liegen unter `/data` — mit dem Volume überleben sie Container-Neustarts und Image-Updates (`docker stop` fährt Postgres geordnet herunter). Optionale Einstellungen wie `SEED_ADMIN_*`, KI-Variablen oder `POSTGRES_PASSWORD` lassen sich per `-e` mitgeben, z. B.:
+
+```bash
+docker run -d --name smartlife-support -p 3000:3000 -v smartlife-data:/data \
+  -e SEED_ADMIN_EMAIL=office@smartlife.software -e SEED_ADMIN_PASSWORD=geheim \
+  -e AI_BASE_URL=https://api.openai.com/v1 -e AI_API_KEY=sk-… -e AI_MODEL=gpt-4o \
+  smartlife-support:all-in-one
+```
+
+Für den Dauerbetrieb ist weiterhin `docker-compose.yml` (getrennte Dienste, getrennte Volumes) die richtige Wahl.
