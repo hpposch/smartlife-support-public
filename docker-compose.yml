@@ -1,0 +1,62 @@
+services:
+  web:
+    build: .
+    command: sh -c "npx prisma migrate deploy && npm run start"
+    ports:
+      - "3000:3000"
+    env_file: .env
+    environment:
+      DATABASE_URL: postgresql://smartlife:${POSTGRES_PASSWORD:-smartlife}@db:5432/smartlife_support
+      REDIS_URL: redis://redis:6379
+      DATA_DIR: /data
+    volumes:
+      - app-data:/data
+    depends_on:
+      db:
+        condition: service_healthy
+      redis:
+        condition: service_started
+    restart: unless-stopped
+
+  worker:
+    build: .
+    command: npm run worker
+    env_file: .env
+    environment:
+      DATABASE_URL: postgresql://smartlife:${POSTGRES_PASSWORD:-smartlife}@db:5432/smartlife_support
+      REDIS_URL: redis://redis:6379
+      DATA_DIR: /data
+    volumes:
+      - app-data:/data
+    depends_on:
+      db:
+        condition: service_healthy
+      redis:
+        condition: service_started
+    restart: unless-stopped
+
+  db:
+    image: postgres:16
+    environment:
+      POSTGRES_USER: smartlife
+      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD:-smartlife}
+      POSTGRES_DB: smartlife_support
+    volumes:
+      - db-data:/var/lib/postgresql/data
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U smartlife -d smartlife_support"]
+      interval: 5s
+      timeout: 3s
+      retries: 10
+    restart: unless-stopped
+
+  redis:
+    image: redis:7
+    volumes:
+      - redis-data:/data
+    restart: unless-stopped
+
+volumes:
+  app-data:
+  db-data:
+  redis-data:

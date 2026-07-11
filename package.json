@@ -1,0 +1,47 @@
+{
+  "name": "smartlife-support",
+  "version": "0.1.0",
+  "private": true,
+  "scripts": {
+    "dev": "next dev",
+    "build": "next build",
+    "start": "next start",
+    "worker": "tsx src/worker/index.ts",
+    "typecheck": "tsc --noEmit",
+    "test": "vitest run",
+    "db:migrate": "prisma migrate deploy",
+    "db:seed": "tsx prisma/seed.ts"
+  },
+  "prisma": {
+    "seed": "tsx prisma/seed.ts"
+  },
+  "dependencies": {
+    "@node-rs/argon2": "^2.0.2",
+    "@prisma/client": "^6.8.0",
+    "bullmq": "^5.44.0",
+    "imapflow": "^1.0.188",
+    "ioredis": "^5.10.1",
+    "iron-session": "^8.0.4",
+    "mailparser": "^3.7.2",
+    "next": "^15.3.0",
+    "nodemailer": "^7.0.0",
+    "react": "^19.1.0",
+    "react-dom": "^19.1.0",
+    "sanitize-html": "^2.14.0",
+    "zod": "^3.24.0"
+  },
+  "devDependencies": {
+    "@tailwindcss/postcss": "^4.1.0",
+    "@types/mailparser": "^3.4.5",
+    "@types/node": "^22.14.0",
+    "@types/nodemailer": "^7.0.0",
+    "@types/react": "^19.1.0",
+    "@types/react-dom": "^19.1.0",
+    "@types/sanitize-html": "^2.13.0",
+    "prisma": "^6.8.0",
+    "tailwindcss": "^4.1.0",
+    "tsx": "^4.19.0",
+    "typescript": "^5.8.0",
+    "vitest": "^3.1.0"
+  }
+}

@@ -36,7 +36,34 @@ Bevor gebaut wird, lohnt der ehrliche Blick auf Alternativen:
 
 Die Entscheidung für den Eigenbau ist dann sinnvoll, wenn tiefe Produktintegration (z. B. Gerätedaten, Kundenkonten, Lizenzstatus direkt im Ticket) und Datenhoheit wichtiger sind als der schnellste Start. Genau darauf ist dieses Design ausgelegt — das MVP ist bewusst schlank gehalten (siehe Roadmap), damit der Erstaufwand überschaubar bleibt.
 
-## Nächste Schritte
+## Stand der Umsetzung
 
-1. Review dieses Designs (insb. Stack-Entscheidung in Dokument 02 und MVP-Zuschnitt in Dokument 05)
-2. Freigabe → Start der Implementierung von Phase 1 (E-Mail-Ticketing + Agenten-Oberfläche)
+**Phase 1 (MVP E-Mail-Ticketing) ist implementiert:**
+
+- ✅ E-Mail-Eingang: IMAP-Poller, MIME-Parsing, HTML-Sanitisierung, Anhänge, 3-stufiges Threading (In-Reply-To/References → Betreff-Token → neues Ticket), Idempotenz, Auto-Reply-/Bounce-/Schleifen-Schutz
+- ✅ E-Mail-Ausgang: Agentenantworten mit korrekten Threading-Headern, Eingangsbestätigung an Kunden, Agenten-Benachrichtigung, Retry mit Backoff
+- ✅ Agenten-UI: Ticketliste mit Filtern & Suche, Ticketdetail mit Verlauf, Antwort/interne Notiz, Anhänge, Status/Priorität/Zuweisung/Kategorie/Tags, manuelles Ticket
+- ✅ Verwaltung: Benutzer, Postfächer, Kategorien, Textbausteine (mit Platzhaltern)
+- ✅ Audit-Log (`ticket_events`), Integrations-API (`POST /api/v1/tickets`), Docker-Compose-Deployment
+- ⬜ Phase 2–4: Kundenportal, Wissensdatenbank, SLA, Automatisierung, Reporting, KI (siehe Roadmap)
+
+## Entwicklung starten
+
+Voraussetzungen: Node 22, PostgreSQL 16, Redis 7 (oder `docker compose up db redis`).
+
+```bash
+cp .env.example .env          # Werte anpassen (mind. SESSION_SECRET)
+npm install
+npx prisma migrate dev        # Schema anlegen
+npm run db:seed               # Admin-Benutzer, Team, Kategorien
+npm run dev                   # Web-App auf http://localhost:3000
+npm run worker                # E-Mail-Worker (zweites Terminal)
+```
+
+Login nach dem Seed: `admin@smartlife.software` / `admin1234` (via `SEED_ADMIN_*` in `.env` änderbar — **vor Produktivbetrieb ändern**).
+
+Postfächer werden unter **Verwaltung → Postfächer** angebunden; das Passwort kommt aus der ENV-Variable, die im Feld `credentialsRef` benannt wird (z. B. `MAILBOX_SUPPORT_PASSWORD`).
+
+**Tests:** `npm test` (Unit-Tests für Threading/Sanitisierung/Auto-Reply-Erkennung) und `npx tsx scripts/smoke-ingest.ts` (End-to-End-Test der E-Mail-Pipeline gegen DB+Redis).
+
+**Produktion:** `docker compose up -d --build` — startet Web, Worker, PostgreSQL und Redis; davor `.env` mit echten Secrets füllen. TLS/Reverse-Proxy (z. B. Caddy) je nach Server-Setup davorschalten.

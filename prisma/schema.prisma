@@ -1,0 +1,298 @@
+// SmartLife Support — MVP-Schema (Phase 1)
+// Entspricht docs/03-datenmodell.md; P2/P3-Tabellen folgen in späteren Migrationen.
+
+generator client {
+  provider = "prisma-client-js"
+}
+
+datasource db {
+  provider = "postgresql"
+  url      = env("DATABASE_URL")
+}
+
+enum UserRole {
+  agent
+  team_lead
+  admin
+}
+
+enum TicketStatus {
+  new
+  open
+  pending_customer
+  pending_internal
+  resolved
+  closed
+}
+
+enum TicketPriority {
+  low
+  normal
+  high
+  urgent
+}
+
+enum TicketChannel {
+  email
+  portal
+  api
+  manual
+}
+
+enum MessageType {
+  customer
+  agent_reply
+  internal_note
+  system
+}
+
+enum SendStatus {
+  none
+  pending
+  sent
+  failed
+}
+
+model User {
+  id           String   @id @default(uuid())
+  email        String   @unique
+  name         String
+  role         UserRole @default(agent)
+  passwordHash String?  @map("password_hash")
+  isActive     Boolean  @default(true) @map("is_active")
+  createdAt    DateTime @default(now()) @map("created_at")
+  updatedAt    DateTime @default(now()) @updatedAt @map("updated_at")
+
+  teams           TeamMember[]
+  assignedTickets Ticket[]
+  messages        Message[]
+  events          TicketEvent[]
+  cannedResponses CannedResponse[]
+
+  @@map("users")
+}
+
+model Team {
+  id             String  @id @default(uuid())
+  name           String  @unique
+  emailSignature String? @map("email_signature")
+
+  members   TeamMember[]
+  tickets   Ticket[]
+  mailboxes Mailbox[]
+  canned    CannedResponse[]
+
+  @@map("teams")
+}
+
+model TeamMember {
+  teamId String @map("team_id")
+  userId String @map("user_id")
+  team   Team   @relation(fields: [teamId], references: [id], onDelete: Cascade)
+  user   User   @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@id([teamId, userId])
+  @@map("team_members")
+}
+
+model Organization {
+  id        String   @id @default(uuid())
+  name      String
+  // Auto-Zuordnung neuer Kontakte über E-Mail-Domain
+  domains   String[] @default([])
+  notes     String?
+  createdAt DateTime @default(now()) @map("created_at")
+
+  contacts Contact[]
+  tickets  Ticket[]
+
+  @@map("organizations")
+}
+
+model Contact {
+  id             String    @id @default(uuid())
+  email          String    @unique
+  name           String?
+  phone          String?
+  organizationId String?   @map("organization_id")
+  isBlocked      Boolean   @default(false) @map("is_blocked")
+  anonymizedAt   DateTime? @map("anonymized_at")
+  createdAt      DateTime  @default(now()) @map("created_at")
+  updatedAt      DateTime  @default(now()) @updatedAt @map("updated_at")
+
+  organization Organization? @relation(fields: [organizationId], references: [id], onDelete: SetNull)
+  tickets      Ticket[]
+  messages     Message[]
+  events       TicketEvent[]
+
+  @@map("contacts")
+}
+
+model Mailbox {
+  id             String  @id @default(uuid())
+  name           String
+  address        String  @unique
+  imapHost       String? @map("imap_host")
+  imapPort       Int?    @map("imap_port")
+  imapUser       String? @map("imap_user")
+  smtpHost       String? @map("smtp_host")
+  smtpPort       Int?    @map("smtp_port")
+  smtpUser       String? @map("smtp_user")
+  // Name der ENV-Variable mit dem Passwort — kein Klartext in der DB
+  credentialsRef String  @map("credentials_ref")
+  defaultTeamId  String? @map("default_team_id")
+  lastSeenUid    BigInt  @default(0) @map("last_seen_uid")
+  isActive       Boolean @default(true) @map("is_active")
+
+  defaultTeam Team?    @relation(fields: [defaultTeamId], references: [id], onDelete: SetNull)
+  tickets     Ticket[]
+
+  @@map("mailboxes")
+}
+
+model TicketCategory {
+  id        String  @id @default(uuid())
+  name      String  @unique
+  sortOrder Int     @default(0) @map("sort_order")
+  isActive  Boolean @default(true) @map("is_active")
+
+  tickets Ticket[]
+
+  @@map("ticket_categories")
+}
+
+model Ticket {
+  id       String         @id @default(uuid())
+  // Fortlaufende, kundensichtbare Nummer (Sequence, s. Migration)
+  number   Int            @unique @default(autoincrement())
+  // Zufalls-Token für Betreff-Threading: [#1000-a3f9c2d1]
+  token    String
+  subject  String
+  status   TicketStatus   @default(new)
+  priority TicketPriority @default(normal)
+  channel  TicketChannel
+
+  contactId      String  @map("contact_id")
+  organizationId String? @map("organization_id")
+  assigneeId     String? @map("assignee_id")
+  teamId         String? @map("team_id")
+  mailboxId      String? @map("mailbox_id")
+  categoryId     String? @map("category_id")
+
+  firstRepliedAt DateTime? @map("first_replied_at")
+  resolvedAt     DateTime? @map("resolved_at")
+  closedAt       DateTime? @map("closed_at")
+  createdAt      DateTime  @default(now()) @map("created_at")
+  updatedAt      DateTime  @default(now()) @updatedAt @map("updated_at")
+
+  contact      Contact         @relation(fields: [contactId], references: [id])
+  organization Organization?   @relation(fields: [organizationId], references: [id], onDelete: SetNull)
+  assignee     User?           @relation(fields: [assigneeId], references: [id], onDelete: SetNull)
+  team         Team?           @relation(fields: [teamId], references: [id], onDelete: SetNull)
+  mailbox      Mailbox?        @relation(fields: [mailboxId], references: [id], onDelete: SetNull)
+  category     TicketCategory? @relation(fields: [categoryId], references: [id], onDelete: SetNull)
+  messages     Message[]
+  tags         TicketTag[]
+  events       TicketEvent[]
+
+  @@index([status, teamId, updatedAt(sort: Desc)])
+  @@index([assigneeId, status])
+  @@index([contactId, createdAt(sort: Desc)])
+  @@map("tickets")
+}
+
+model Message {
+  id       String      @id @default(uuid())
+  ticketId String      @map("ticket_id")
+  type     MessageType
+  userId   String?     @map("user_id")
+  contactId String?    @map("contact_id")
+  bodyHtml String?     @map("body_html")
+  bodyText String      @map("body_text")
+
+  // E-Mail-Metadaten (Threading + Idempotenz)
+  emailMessageId String?  @unique @map("email_message_id")
+  inReplyTo      String?  @map("in_reply_to")
+  emailFrom      String?  @map("email_from")
+  emailTo        String[] @default([]) @map("email_to")
+  emailCc        String[] @default([]) @map("email_cc")
+  rawEmlKey      String?  @map("raw_eml_key")
+
+  sendStatus SendStatus @default(none) @map("send_status")
+  sendError  String?    @map("send_error")
+  createdAt  DateTime   @default(now()) @map("created_at")
+
+  ticket      Ticket       @relation(fields: [ticketId], references: [id], onDelete: Cascade)
+  user        User?        @relation(fields: [userId], references: [id], onDelete: SetNull)
+  contact     Contact?     @relation(fields: [contactId], references: [id], onDelete: SetNull)
+  attachments Attachment[]
+
+  @@index([ticketId, createdAt])
+  @@map("messages")
+}
+
+model Attachment {
+  id          String  @id @default(uuid())
+  messageId   String  @map("message_id")
+  fileName    String  @map("file_name")
+  contentType String  @map("content_type")
+  sizeBytes   Int     @map("size_bytes")
+  storageKey  String  @map("storage_key")
+  isInline    Boolean @default(false) @map("is_inline")
+  contentId   String? @map("content_id")
+
+  message Message @relation(fields: [messageId], references: [id], onDelete: Cascade)
+
+  @@map("attachments")
+}
+
+model Tag {
+  id    String  @id @default(uuid())
+  name  String  @unique
+  color String?
+
+  tickets TicketTag[]
+
+  @@map("tags")
+}
+
+model TicketTag {
+  ticketId String @map("ticket_id")
+  tagId    String @map("tag_id")
+  ticket   Ticket @relation(fields: [ticketId], references: [id], onDelete: Cascade)
+  tag      Tag    @relation(fields: [tagId], references: [id], onDelete: Cascade)
+
+  @@id([ticketId, tagId])
+  @@map("ticket_tags")
+}
+
+model TicketEvent {
+  id             String   @id @default(uuid())
+  ticketId       String   @map("ticket_id")
+  eventType      String   @map("event_type")
+  actorUserId    String?  @map("actor_user_id")
+  actorContactId String?  @map("actor_contact_id")
+  payload        Json     @default("{}")
+  createdAt      DateTime @default(now()) @map("created_at")
+
+  ticket       Ticket   @relation(fields: [ticketId], references: [id], onDelete: Cascade)
+  actorUser    User?    @relation(fields: [actorUserId], references: [id], onDelete: SetNull)
+  actorContact Contact? @relation(fields: [actorContactId], references: [id], onDelete: SetNull)
+
+  @@index([ticketId, createdAt])
+  @@map("ticket_events")
+}
+
+model CannedResponse {
+  id        String   @id @default(uuid())
+  title     String
+  body      String
+  teamId    String?  @map("team_id")
+  createdBy String?  @map("created_by")
+  createdAt DateTime @default(now()) @map("created_at")
+
+  team    Team? @relation(fields: [teamId], references: [id], onDelete: Cascade)
+  creator User? @relation(fields: [createdBy], references: [id], onDelete: SetNull)
+
+  @@map("canned_responses")
+}

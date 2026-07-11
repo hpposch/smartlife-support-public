@@ -1,0 +1,129 @@
+import { revalidatePath } from "next/cache";
+import { z } from "zod";
+import { requireAdmin } from "@/lib/auth";
+import { db } from "@/lib/db";
+
+const schema = z.object({
+  name: z.string().min(1),
+  address: z.string().email(),
+  imapHost: z.string().min(1),
+  imapPort: z.coerce.number().int().positive(),
+  imapUser: z.string().min(1),
+  smtpHost: z.string().min(1),
+  smtpPort: z.coerce.number().int().positive(),
+  smtpUser: z.string().min(1),
+  credentialsRef: z
+    .string()
+    .regex(/^[A-Z][A-Z0-9_]*$/, "Name einer ENV-Variable, z. B. MAILBOX_SUPPORT_PASSWORD"),
+});
+
+async function createMailbox(formData: FormData) {
+  "use server";
+  await requireAdmin();
+  const input = schema.parse(Object.fromEntries(formData));
+  const team = await db.team.findFirst();
+  await db.mailbox.create({
+    data: { ...input, address: input.address.toLowerCase(), defaultTeamId: team?.id ?? null },
+  });
+  revalidatePath("/settings/mailboxes");
+}
+
+async function toggleMailbox(formData: FormData) {
+  "use server";
+  await requireAdmin();
+  const id = String(formData.get("id"));
+  const mailbox = await db.mailbox.findUniqueOrThrow({ where: { id } });
+  await db.mailbox.update({ where: { id }, data: { isActive: !mailbox.isActive } });
+  revalidatePath("/settings/mailboxes");
+}
+
+export default async function MailboxesPage() {
+  await requireAdmin();
+  const mailboxes = await db.mailbox.findMany({ orderBy: { address: "asc" } });
+
+  return (
+    <div className="mx-auto max-w-3xl space-y-6">
+      <h1 className="text-lg font-semibold">Postfächer</h1>
+      <p className="text-sm text-slate-500">
+        Das Passwort wird nicht in der Datenbank gespeichert: <code>credentialsRef</code> benennt
+        die Umgebungsvariable, die das Passwort enthält (z. B.{" "}
+        <code>MAILBOX_SUPPORT_PASSWORD</code> in der <code>.env</code> bzw. im Deployment).
+      </p>
+
+      <div className="overflow-hidden rounded-lg border border-slate-200 bg-white shadow-sm">
+        <table className="w-full text-sm">
+          <thead>
+            <tr className="border-b border-slate-200 text-left text-xs uppercase text-slate-500">
+              <th className="px-4 py-2">Adresse</th>
+              <th className="px-4 py-2">IMAP</th>
+              <th className="px-4 py-2">SMTP</th>
+              <th className="px-4 py-2">Status</th>
+              <th className="px-4 py-2" />
+            </tr>
+          </thead>
+          <tbody>
+            {mailboxes.length === 0 && (
+              <tr>
+                <td colSpan={5} className="px-4 py-8 text-center text-slate-400">
+                  Noch kein Postfach angebunden.
+                </td>
+              </tr>
+            )}
+            {mailboxes.map((mb) => (
+              <tr key={mb.id} className="border-b border-slate-100 last:border-0">
+                <td className="px-4 py-2 font-medium">{mb.address}</td>
+                <td className="px-4 py-2 text-slate-600">
+                  {mb.imapHost}:{mb.imapPort}
+                </td>
+                <td className="px-4 py-2 text-slate-600">
+                  {mb.smtpHost}:{mb.smtpPort}
+                </td>
+                <td className="px-4 py-2">
+                  {mb.isActive ? (
+                    <span className="text-emerald-600">aktiv</span>
+                  ) : (
+                    <span className="text-slate-400">pausiert</span>
+                  )}
+                </td>
+                <td className="px-4 py-2 text-right">
+                  <form action={toggleMailbox}>
+                    <input type="hidden" name="id" value={mb.id} />
+                    <button type="submit" className="text-xs text-blue-700 hover:underline">
+                      {mb.isActive ? "Pausieren" : "Aktivieren"}
+                    </button>
+                  </form>
+                </td>
+              </tr>
+            ))}
+          </tbody>
+        </table>
+      </div>
+
+      <form
+        action={createMailbox}
+        className="space-y-3 rounded-lg border border-slate-200 bg-white p-4 shadow-sm"
+      >
+        <h2 className="text-sm font-semibold">Postfach anbinden</h2>
+        <div className="grid gap-3 sm:grid-cols-2">
+          <input name="name" required placeholder="Anzeigename (z. B. Support)" className="input" />
+          <input name="address" type="email" required placeholder="support@smartlife.software" className="input" />
+          <input name="imapHost" required placeholder="IMAP-Host (z. B. outlook.office365.com)" className="input" />
+          <input name="imapPort" type="number" defaultValue={993} required placeholder="IMAP-Port" className="input" />
+          <input name="imapUser" required placeholder="IMAP-Benutzer" className="input" />
+          <input name="smtpHost" required placeholder="SMTP-Host (z. B. smtp.office365.com)" className="input" />
+          <input name="smtpPort" type="number" defaultValue={587} required placeholder="SMTP-Port" className="input" />
+          <input name="smtpUser" required placeholder="SMTP-Benutzer" className="input" />
+          <input
+            name="credentialsRef"
+            required
+            placeholder="ENV-Variable mit Passwort, z. B. MAILBOX_SUPPORT_PASSWORD"
+            className="input sm:col-span-2"
+          />
+        </div>
+        <button type="submit" className="btn-primary">
+          Anbinden
+        </button>
+      </form>
+    </div>
+  );
+}
