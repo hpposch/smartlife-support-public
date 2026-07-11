@@ -94,6 +94,16 @@ async function main() {
       },
       { connection, concurrency: 4 }
     ),
+
+    new Worker<{ ticketId: string }>(
+      "ai-classify",
+      async (job) => {
+        const { classifyTicket, isAutoClassifyEnabled } = await import("@/server/ai");
+        if (!isAutoClassifyEnabled()) return;
+        await classifyTicket(job.data.ticketId);
+      },
+      { connection, concurrency: 2 }
+    ),
   ];
 
   for (const worker of workers) {

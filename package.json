@@ -19,6 +19,7 @@
     "seed": "tsx prisma/seed.ts"
   },
   "dependencies": {
+    "@anthropic-ai/sdk": "^0.111.0",
     "@node-rs/argon2": "^2.0.2",
     "@prisma/client": "^6.8.0",
     "bullmq": "^5.44.0",
@@ -33,7 +34,7 @@
     "react": "^19.1.0",
     "react-dom": "^19.1.0",
     "sanitize-html": "^2.14.0",
-    "zod": "^3.24.0"
+    "zod": "^3.25.76"
   },
   "devDependencies": {
     "@tailwindcss/postcss": "^4.1.0",

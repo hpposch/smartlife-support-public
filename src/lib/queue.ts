@@ -46,6 +46,11 @@ function createQueues() {
       connection,
       defaultJobOptions: { attempts: 3, backoff: { type: "exponential", delay: 30000 } },
     }),
+    /** KI-Klassifizierung neuer Tickets (Kategorie, Priorität, Stimmung) */
+    aiClassify: new Queue<{ ticketId: string }>("ai-classify", {
+      connection,
+      defaultJobOptions: { attempts: 2, backoff: { type: "exponential", delay: 15000 } },
+    }),
   };
 }
 

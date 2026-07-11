@@ -144,9 +144,14 @@ export async function finalizeNewTicket(ticketId: string): Promise<void> {
   const { runCreationRules } = await import("./automation");
   const { applySla } = await import("./sla");
   const { emitWebhookEvent } = await import("./webhooks");
+  const { isAutoClassifyEnabled } = await import("./ai");
   await runCreationRules(ticketId);
   await applySla(ticketId);
   await emitWebhookEvent("ticket.created", ticketId);
+  // KI-Klassifizierung asynchron im Worker (blockiert den Eingang nicht)
+  if (isAutoClassifyEnabled()) {
+    await queues().aiClassify.add("classify", { ticketId });
+  }
 }
 
 /** CSAT-Umfrage anlegen und versenden (einmal pro Ticket, nur wenn aktiviert). */

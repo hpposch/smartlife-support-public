@@ -56,6 +56,35 @@ export async function submitMessage(formData: FormData) {
   revalidatePath(`/tickets/${input.ticketId}`);
 }
 
+/** KI-Antwortentwurf erzeugen — Rückgabe wird clientseitig ins Textfeld übernommen. */
+export async function generateAiDraft(ticketId: string): Promise<
+  { ok: true; draft: string } | { ok: false; error: string }
+> {
+  await requireUser();
+  const { isAiEnabled, draftReply } = await import("@/server/ai");
+  if (!isAiEnabled()) return { ok: false, error: "KI ist nicht konfiguriert" };
+  try {
+    return { ok: true, draft: await draftReply(z.string().uuid().parse(ticketId)) };
+  } catch (error) {
+    console.error("[ai] Entwurf fehlgeschlagen:", error);
+    return { ok: false, error: "Entwurf konnte nicht erstellt werden" };
+  }
+}
+
+/** KI-Zusammenfassung als interne Notiz anhängen. */
+export async function generateAiSummary(formData: FormData) {
+  const user = await requireUser();
+  const ticketId = z.string().uuid().parse(formData.get("ticketId"));
+  const { isAiEnabled, summarizeTicket } = await import("@/server/ai");
+  if (!isAiEnabled()) return;
+  try {
+    await summarizeTicket(ticketId, user.id);
+  } catch (error) {
+    console.error("[ai] Zusammenfassung fehlgeschlagen:", error);
+  }
+  revalidatePath(`/tickets/${ticketId}`);
+}
+
 const updateSchema = z.object({
   ticketId: z.string().uuid(),
   status: z.enum(["new", "open", "pending_customer", "pending_internal", "resolved", "closed"]),

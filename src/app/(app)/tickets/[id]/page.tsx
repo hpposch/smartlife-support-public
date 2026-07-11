@@ -8,8 +8,9 @@ import {
   STATUS_LABELS,
   formatDateTime,
 } from "@/lib/labels";
+import { isAiEnabled } from "@/server/ai";
 import { ReplyBox } from "./reply-box";
-import { updateTicketProperties } from "./actions";
+import { generateAiSummary, updateTicketProperties } from "./actions";
 
 function SlaDue({ dueAt, done, paused }: { dueAt: Date; done: boolean; paused: boolean }) {
   if (done) return <span className="text-emerald-600">erfüllt</span>;
@@ -74,6 +75,18 @@ export default async function TicketDetailPage({
             >
               {STATUS_LABELS[ticket.status]}
             </span>
+            {isAiEnabled() && (
+              <form action={generateAiSummary} className="ml-auto">
+                <input type="hidden" name="ticketId" value={ticket.id} />
+                <button
+                  type="submit"
+                  className="rounded-md bg-violet-50 px-3 py-1 text-sm font-medium text-violet-700 hover:bg-violet-100"
+                  title="Zusammenfassung des Verlaufs als interne Notiz anhängen"
+                >
+                  ✨ Zusammenfassen
+                </button>
+              </form>
+            )}
           </div>
           <p className="mt-1 text-sm text-slate-500">
             {ticket.contact.name ?? ticket.contact.email}
@@ -143,6 +156,7 @@ export default async function TicketDetailPage({
         <div className="mt-4">
           <ReplyBox
             ticketId={ticket.id}
+            aiEnabled={isAiEnabled()}
             canned={canned.map((c) => ({ id: c.id, title: c.title, body: c.body }))}
             placeholders={{
               "ticket.number": String(ticket.number),

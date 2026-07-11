@@ -1,7 +1,7 @@
 "use client";
 
 import { useRef, useState, useTransition } from "react";
-import { submitMessage } from "./actions";
+import { generateAiDraft, submitMessage } from "./actions";
 
 interface CannedResponse {
   id: string;
@@ -13,15 +13,36 @@ export function ReplyBox({
   ticketId,
   canned,
   placeholders,
+  aiEnabled,
 }: {
   ticketId: string;
   canned: CannedResponse[];
   placeholders: Record<string, string>;
+  aiEnabled?: boolean;
 }) {
   const [kind, setKind] = useState<"reply" | "note">("reply");
   const [isPending, startTransition] = useTransition();
+  const [isDrafting, startDrafting] = useTransition();
+  const [aiError, setAiError] = useState<string | null>(null);
   const textareaRef = useRef<HTMLTextAreaElement>(null);
   const formRef = useRef<HTMLFormElement>(null);
+
+  function requestDraft() {
+    setAiError(null);
+    startDrafting(async () => {
+      const result = await generateAiDraft(ticketId);
+      if (result.ok) {
+        const el = textareaRef.current;
+        if (el) {
+          el.value = result.draft;
+          el.focus();
+        }
+        setKind("reply");
+      } else {
+        setAiError(result.error);
+      }
+    });
+  }
 
   function insertCanned(body: string) {
     let text = body;
@@ -71,9 +92,20 @@ export function ReplyBox({
           Interne Notiz
         </button>
 
+        {aiEnabled && (
+          <button
+            type="button"
+            onClick={requestDraft}
+            disabled={isDrafting}
+            className="ml-auto rounded-md bg-violet-50 px-3 py-1 text-sm font-medium text-violet-700 hover:bg-violet-100 disabled:opacity-50"
+          >
+            {isDrafting ? "✨ Entwurf wird erstellt …" : "✨ KI-Entwurf"}
+          </button>
+        )}
+
         {canned.length > 0 && (
           <select
-            className="input ml-auto w-auto"
+            className={`input w-auto ${aiEnabled ? "" : "ml-auto"}`}
             defaultValue=""
             onChange={(e) => {
               const item = canned.find((c) => c.id === e.target.value);
@@ -92,6 +124,10 @@ export function ReplyBox({
           </select>
         )}
       </div>
+
+      {aiError && (
+        <p className="mb-2 rounded-md bg-red-50 px-3 py-1.5 text-xs text-red-700">{aiError}</p>
+      )}
 
       <textarea
         ref={textareaRef}
