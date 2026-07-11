@@ -26,7 +26,24 @@ async function pollMailbox(mailbox: Mailbox): Promise<number> {
   try {
     const lock = await client.getMailboxLock("INBOX");
     try {
-      const lastSeen = Number(mailbox.lastSeenUid);
+      // UIDVALIDITY-Wechsel (kommt bei Gmail vor): alle UIDs sind ungültig →
+      // Abruf beginnt bei 0; Duplikate verhindert die Message-ID-Idempotenz.
+      const uidValidity = BigInt(client.mailbox && typeof client.mailbox === "object"
+        ? (client.mailbox.uidValidity ?? 0n)
+        : 0n);
+      let lastSeen = Number(mailbox.lastSeenUid);
+      if (mailbox.uidValidity !== null && uidValidity !== 0n && uidValidity !== mailbox.uidValidity) {
+        console.warn(
+          `[mail-poll] ${mailbox.address}: UIDVALIDITY geändert (${mailbox.uidValidity} → ${uidValidity}), Abruf beginnt neu`
+        );
+        lastSeen = 0;
+      }
+      if (uidValidity !== 0n && uidValidity !== mailbox.uidValidity) {
+        await db.mailbox.update({
+          where: { id: mailbox.id },
+          data: { uidValidity, ...(lastSeen === 0 ? { lastSeenUid: 0n } : {}) },
+        });
+      }
       let maxUid = lastSeen;
 
       for await (const msg of client.fetch(

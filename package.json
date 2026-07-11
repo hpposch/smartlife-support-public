@@ -13,7 +13,8 @@
     "db:seed": "tsx prisma/seed.ts",
     "backup:create": "tsx scripts/backup-create.ts",
     "backup:restore": "tsx scripts/backup-restore.ts",
-    "smoke": "tsx scripts/smoke-ingest.ts"
+    "smoke": "tsx scripts/smoke-ingest.ts",
+    "mailbox:check": "tsx scripts/mailbox-check.ts"
   },
   "prisma": {
     "seed": "tsx prisma/seed.ts"

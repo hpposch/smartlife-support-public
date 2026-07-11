@@ -49,6 +49,24 @@ export default async function MailboxesPage() {
         die Umgebungsvariable, die das Passwort enthält (z. B.{" "}
         <code>MAILBOX_SUPPORT_PASSWORD</code> in der <code>.env</code> bzw. im Deployment).
       </p>
+      <div className="rounded-lg border border-blue-200 bg-blue-50/50 p-4 text-sm text-slate-600">
+        <p className="font-medium text-slate-700">Gmail / Google Workspace</p>
+        <ol className="mt-1 list-decimal space-y-0.5 pl-5">
+          <li>Im Google-Konto die <strong>2-Faktor-Authentifizierung</strong> aktivieren</li>
+          <li>
+            Unter <em>Google-Konto → Sicherheit → App-Passwörter</em> ein{" "}
+            <strong>App-Passwort</strong> erzeugen (16 Zeichen, ohne Leerzeichen eintragen)
+          </li>
+          <li>In Gmail unter <em>Einstellungen → Weiterleitung/POP/IMAP</em> IMAP aktivieren</li>
+          <li>
+            Hier eintragen: IMAP <code>imap.gmail.com:993</code>, SMTP{" "}
+            <code>smtp.gmail.com:587</code>, Benutzer = vollständige Adresse
+          </li>
+          <li>
+            Anbindung prüfen: <code>npm run mailbox:check -- &lt;adresse&gt;</code>
+          </li>
+        </ol>
+      </div>
 
       <div className="overflow-hidden rounded-lg border border-slate-200 bg-white shadow-sm">
         <table className="w-full text-sm">
@@ -106,11 +124,11 @@ export default async function MailboxesPage() {
         <h2 className="text-sm font-semibold">Postfach anbinden</h2>
         <div className="grid gap-3 sm:grid-cols-2">
           <input name="name" required placeholder="Anzeigename (z. B. Support)" className="input" />
-          <input name="address" type="email" required placeholder="support@smartlife.software" className="input" />
-          <input name="imapHost" required placeholder="IMAP-Host (z. B. outlook.office365.com)" className="input" />
+          <input name="address" type="email" required placeholder="support@smartlifebi.com" className="input" />
+          <input name="imapHost" required placeholder="IMAP-Host (Gmail: imap.gmail.com)" className="input" />
           <input name="imapPort" type="number" defaultValue={993} required placeholder="IMAP-Port" className="input" />
           <input name="imapUser" required placeholder="IMAP-Benutzer" className="input" />
-          <input name="smtpHost" required placeholder="SMTP-Host (z. B. smtp.office365.com)" className="input" />
+          <input name="smtpHost" required placeholder="SMTP-Host (Gmail: smtp.gmail.com)" className="input" />
           <input name="smtpPort" type="number" defaultValue={587} required placeholder="SMTP-Port" className="input" />
           <input name="smtpUser" required placeholder="SMTP-Benutzer" className="input" />
           <input

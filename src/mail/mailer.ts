@@ -15,6 +15,8 @@ export function smtpTransport(mailbox: Mailbox): Transporter {
     host: mailbox.smtpHost,
     port: mailbox.smtpPort,
     secure: mailbox.smtpPort === 465,
+    // Auf 587 (z. B. Gmail) TLS-Upgrade erzwingen — nie unverschlüsselt senden
+    requireTLS: mailbox.smtpPort !== 465,
     auth: { user: mailbox.smtpUser, pass: mailboxPassword(mailbox.credentialsRef) },
   });
   transports.set(mailbox.id, transport);

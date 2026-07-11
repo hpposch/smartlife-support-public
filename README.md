@@ -87,6 +87,29 @@ Login nach dem Seed: `admin@smartlife.software` / `admin1234` (via `SEED_ADMIN_*
 
 Postfächer werden unter **Verwaltung → Postfächer** angebunden; das Passwort kommt aus der ENV-Variable, die im Feld `credentialsRef` benannt wird (z. B. `MAILBOX_SUPPORT_PASSWORD`).
 
+### Gmail-Postfach anbinden (support@smartlifebi.com)
+
+Gmail erlaubt keine normalen Passwörter für IMAP/SMTP — es braucht ein **App-Passwort**:
+
+1. **2-Faktor-Authentifizierung aktivieren** für das Google-Konto des Postfachs (App-Passwörter gibt es nur mit 2FA; bei Google Workspace darf der Admin sie nicht deaktiviert haben)
+2. **App-Passwort erzeugen:** [myaccount.google.com/apppasswords](https://myaccount.google.com/apppasswords) → Name z. B. „SmartLife Support“ → das 16-stellige Passwort **ohne Leerzeichen** kopieren
+3. **IMAP aktivieren:** Gmail → Zahnrad → *Alle Einstellungen* → *Weiterleitung und POP/IMAP* → IMAP aktivieren
+4. **In der `.env`** (bzw. im Deployment): `MAILBOX_SUPPORT_PASSWORD="<app-passwort>"`
+5. **Unter Verwaltung → Postfächer anlegen:**
+   | Feld | Wert |
+   |---|---|
+   | Adresse / IMAP-/SMTP-Benutzer | `support@smartlifebi.com` |
+   | IMAP | `imap.gmail.com` : `993` |
+   | SMTP | `smtp.gmail.com` : `587` |
+   | credentialsRef | `MAILBOX_SUPPORT_PASSWORD` |
+6. **Anbindung prüfen:** `npm run mailbox:check -- support@smartlifebi.com` — testet IMAP- und SMTP-Login, ohne etwas zu versenden
+
+Hinweise für den Betrieb mit Gmail:
+- Der Versand läuft über `smtp.gmail.com` mit erzwungenem TLS; Gmail legt gesendete Mails automatisch im „Gesendet“-Ordner ab
+- Gmail-Limit: ca. 500 (Konto) bzw. 2.000 (Workspace) ausgehende Mails/Tag — für Support-Volumen normalerweise unkritisch
+- Für die Zustellbarkeit sollten **SPF/DKIM für smartlifebi.com** in Google Workspace eingerichtet sein (Admin-Konsole → Apps → Google Workspace → Gmail → E-Mail-Authentifizierung)
+- Ändert Gmail die interne IMAP-Nummerierung (UIDVALIDITY), erkennt der Poller das und beginnt den Abruf neu — Duplikate entstehen dabei nicht (Message-ID-Schutz)
+
 ### Azure AD B2C für das Kundenportal einrichten
 
 1. Im B2C-Tenant eine **App-Registrierung** (Typ *Web*) anlegen; Redirect-URI: `https://<APP_URL>/portal/auth/b2c/callback`, Client-Secret erzeugen
