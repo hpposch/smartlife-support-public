@@ -52,7 +52,7 @@ export async function GET(request: NextRequest) {
     flow.destroy();
     const session = await getIronSession<PortalSessionData>(
       await cookies(),
-      portalSessionOptions
+      portalSessionOptions()
     );
     session.contactId = contact.id;
     await session.save();

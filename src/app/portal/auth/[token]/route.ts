@@ -37,7 +37,7 @@ export async function GET(
 
   const session = await getIronSession<PortalSessionData>(
     await cookies(),
-    portalSessionOptions
+    portalSessionOptions()
   );
   session.contactId = record.contactId;
   await session.save();

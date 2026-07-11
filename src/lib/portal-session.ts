@@ -11,19 +11,23 @@ export interface PortalSessionData {
   contactId?: string;
 }
 
-export const portalSessionOptions: SessionOptions = {
-  cookieName: "smartlife_portal_session",
-  password: env.sessionSecret,
-  ttl: 60 * 60 * 24 * 30, // 30 Tage
-  cookieOptions: {
-    httpOnly: true,
-    sameSite: "lax",
-    secure: process.env.NODE_ENV === "production",
-  },
-};
+// Als Funktion, nicht als Konstante: SESSION_SECRET darf erst zur Laufzeit
+// gelesen werden, sonst scheitert `next build` ohne gesetzte Umgebung
+export function portalSessionOptions(): SessionOptions {
+  return {
+    cookieName: "smartlife_portal_session",
+    password: env.sessionSecret,
+    ttl: 60 * 60 * 24 * 30, // 30 Tage
+    cookieOptions: {
+      httpOnly: true,
+      sameSite: "lax",
+      secure: process.env.NODE_ENV === "production",
+    },
+  };
+}
 
 export async function getPortalSession() {
-  return getIronSession<PortalSessionData>(await cookies(), portalSessionOptions);
+  return getIronSession<PortalSessionData>(await cookies(), portalSessionOptions());
 }
 
 export const getCurrentContact = cache(async () => {
