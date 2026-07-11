@@ -10,7 +10,10 @@
     "typecheck": "tsc --noEmit",
     "test": "vitest run",
     "db:migrate": "prisma migrate deploy",
-    "db:seed": "tsx prisma/seed.ts"
+    "db:seed": "tsx prisma/seed.ts",
+    "backup:create": "tsx scripts/backup-create.ts",
+    "backup:restore": "tsx scripts/backup-restore.ts",
+    "smoke": "tsx scripts/smoke-ingest.ts"
   },
   "prisma": {
     "seed": "tsx prisma/seed.ts"

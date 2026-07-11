@@ -32,6 +32,11 @@ function createQueues() {
       connection,
       defaultJobOptions: { attempts: 3, backoff: { type: "exponential", delay: 10000 } },
     }),
+    /** Tägliches Voll-Backup (DB + Datei-Ablage als eine Datei) */
+    backup: new Queue("backup", {
+      connection,
+      defaultJobOptions: { attempts: 2, backoff: { type: "exponential", delay: 60000 } },
+    }),
   };
 }
 

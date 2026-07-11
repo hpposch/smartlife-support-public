@@ -1,13 +1,24 @@
+import { headers } from "next/headers";
 import { redirect } from "next/navigation";
 import { verifyCredentials } from "@/lib/auth";
+import { rateLimit, rateLimitReset } from "@/lib/ratelimit";
 import { getSession } from "@/lib/session";
 
 async function login(formData: FormData) {
   "use server";
-  const email = String(formData.get("email") ?? "");
+  const email = String(formData.get("email") ?? "").toLowerCase().trim();
   const password = String(formData.get("password") ?? "");
+
+  const ip = (await headers()).get("x-forwarded-for")?.split(",")[0]?.trim() ?? "local";
+  const [byIp, byEmail] = await Promise.all([
+    rateLimit("login-ip", ip, { max: 20, windowSeconds: 900 }),
+    rateLimit("login-email", email, { max: 10, windowSeconds: 900 }),
+  ]);
+  if (!byIp.allowed || !byEmail.allowed) redirect("/login?error=ratelimit");
+
   const user = await verifyCredentials(email, password);
   if (!user) redirect("/login?error=1");
+  await rateLimitReset("login-email", email);
 
   const session = await getSession();
   session.userId = user.id;
@@ -28,7 +39,9 @@ export default async function LoginPage({
         <p className="mb-6 text-sm text-slate-500">Anmeldung für Agenten</p>
         {params.error && (
           <p className="mb-4 rounded-md bg-red-50 px-3 py-2 text-sm text-red-700">
-            E-Mail oder Passwort falsch.
+            {params.error === "ratelimit"
+              ? "Zu viele Versuche — bitte in 15 Minuten erneut versuchen."
+              : "E-Mail oder Passwort falsch."}
           </p>
         )}
         <form action={login} className="space-y-4">

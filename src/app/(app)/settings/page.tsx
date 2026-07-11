@@ -6,6 +6,7 @@ const SECTIONS = [
   { href: "/settings/mailboxes", title: "Postfächer", desc: "Support-Postfächer (IMAP/SMTP) anbinden" },
   { href: "/settings/categories", title: "Kategorien", desc: "Ticket-Kategorien pflegen" },
   { href: "/settings/canned", title: "Textbausteine", desc: "Vordefinierte Antworten mit Platzhaltern" },
+  { href: "/settings/backups", title: "Backups", desc: "Automatische Sicherungen als eine Datei, Download & Wiederherstellung" },
 ];
 
 export default async function SettingsPage() {

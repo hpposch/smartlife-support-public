@@ -1,0 +1,42 @@
+name: CI
+
+on:
+  push:
+    branches: ["**"]
+  pull_request:
+
+jobs:
+  test:
+    runs-on: ubuntu-latest
+    services:
+      postgres:
+        image: postgres:16
+        env:
+          POSTGRES_USER: smartlife
+          POSTGRES_PASSWORD: smartlife
+          POSTGRES_DB: smartlife_support
+        ports: ["5432:5432"]
+        options: >-
+          --health-cmd "pg_isready -U smartlife" --health-interval 5s
+          --health-timeout 3s --health-retries 10
+      redis:
+        image: redis:7
+        ports: ["6379:6379"]
+    env:
+      DATABASE_URL: postgresql://smartlife:smartlife@localhost:5432/smartlife_support
+      REDIS_URL: redis://localhost:6379
+      SESSION_SECRET: ci-only-secret-ci-only-secret-ci-only
+      DATA_DIR: ./data
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+          cache: npm
+      - run: npm ci
+      - run: npx prisma migrate deploy
+      - run: npm run typecheck
+      - run: npm test
+      - name: End-to-End-Rauchtest der E-Mail-Pipeline
+        run: npm run smoke
+      - run: npm run build

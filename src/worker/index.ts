@@ -6,13 +6,16 @@ import { createRedis, queues, type NotifyJob } from "@/lib/queue";
 import { ingestEmail } from "@/mail/ingest";
 import { pollAllMailboxes } from "@/mail/poll";
 import { sendAgentReply, sendNotification } from "@/mail/send";
+import { createBackup } from "@/server/backup";
 
 const connection = createRedis();
 const POLL_INTERVAL_MS = Number(process.env.MAIL_POLL_INTERVAL_MS ?? 60_000);
+const BACKUP_CRON = process.env.BACKUP_CRON ?? "0 3 * * *"; // täglich 03:00
 
 async function main() {
-  // Wiederkehrender Abruf-Job (ein Scheduler-Eintrag, überlebt Neustarts)
+  // Wiederkehrende Jobs (ein Scheduler-Eintrag je Job, überlebt Neustarts)
   await queues().mailPoll.upsertJobScheduler("poll-all", { every: POLL_INTERVAL_MS });
+  await queues().backup.upsertJobScheduler("daily-backup", { pattern: BACKUP_CRON });
 
   const workers = [
     new Worker(
@@ -48,6 +51,17 @@ async function main() {
         await sendNotification(job.data);
       },
       { connection, concurrency: 2 }
+    ),
+
+    new Worker(
+      "backup",
+      async () => {
+        const info = await createBackup();
+        console.log(
+          `[backup] ${info.fileName} erstellt (${(info.sizeBytes / 1024 / 1024).toFixed(1)} MB)`
+        );
+      },
+      { connection, concurrency: 1 }
     ),
   ];
 

@@ -9,13 +9,21 @@ services:
       DATABASE_URL: postgresql://smartlife:${POSTGRES_PASSWORD:-smartlife}@db:5432/smartlife_support
       REDIS_URL: redis://redis:6379
       DATA_DIR: /data
+      BACKUP_DIR: /backups
     volumes:
       - app-data:/data
+      - ./backups:/backups
     depends_on:
       db:
         condition: service_healthy
       redis:
         condition: service_started
+    healthcheck:
+      test: ["CMD-SHELL", "curl -fsS http://localhost:3000/api/health || exit 1"]
+      interval: 30s
+      timeout: 5s
+      retries: 3
+      start_period: 30s
     restart: unless-stopped
 
   worker:
@@ -26,8 +34,10 @@ services:
       DATABASE_URL: postgresql://smartlife:${POSTGRES_PASSWORD:-smartlife}@db:5432/smartlife_support
       REDIS_URL: redis://redis:6379
       DATA_DIR: /data
+      BACKUP_DIR: /backups
     volumes:
       - app-data:/data
+      - ./backups:/backups
     depends_on:
       db:
         condition: service_healthy
