@@ -136,6 +136,8 @@ model Contact {
   azureB2cId     String?   @unique @map("azure_b2c_id")
   organizationId String?   @map("organization_id")
   isBlocked      Boolean   @default(false) @map("is_blocked")
+  // Verifiziert = Identität bestätigt (Portal-/B2C-Login oder manuell durch Agent)
+  verifiedAt     DateTime? @map("verified_at")
   anonymizedAt   DateTime? @map("anonymized_at")
   createdAt      DateTime  @default(now()) @map("created_at")
   updatedAt      DateTime  @default(now()) @updatedAt @map("updated_at")
@@ -276,6 +278,8 @@ model Ticket {
 
   // Werte der produktspezifischen Custom Fields ({ key: wert })
   customFields Json? @map("custom_fields")
+  // CC-Empfänger: erhalten Eingangsbestätigung und Agentenantworten in Kopie
+  ccEmails     String[] @default([]) @map("cc_emails")
 
   // SLA (Phase 3): Fristen laufen in Geschäftszeiten, pausieren bei "Wartet auf Kunde"
   slaPolicyId        String?   @map("sla_policy_id")

@@ -2,18 +2,22 @@
 import { db } from "@/lib/db";
 
 export interface ReportRange {
+  productId?: string;
   from: Date;
   to: Date;
 }
 
 export async function overviewStats(range: ReportRange) {
-  const createdWhere = { createdAt: { gte: range.from, lte: range.to } };
+  const product = range.productId ? { productId: range.productId } : {};
+  const createdWhere = { createdAt: { gte: range.from, lte: range.to }, ...product };
 
   const [created, resolved, openNow, firstResponses, resolutionTimes, slaEvents, csat] =
     await Promise.all([
       db.ticket.count({ where: createdWhere }),
-      db.ticket.count({ where: { resolvedAt: { gte: range.from, lte: range.to } } }),
-      db.ticket.count({ where: { status: { in: ["new", "open", "pending_internal", "pending_customer"] } } }),
+      db.ticket.count({ where: { resolvedAt: { gte: range.from, lte: range.to }, ...product } }),
+      db.ticket.count({
+        where: { status: { in: ["new", "open", "pending_internal", "pending_customer"] }, ...product },
+      }),
       db.ticket.findMany({
         where: { ...createdWhere, firstRepliedAt: { not: null } },
         select: { createdAt: true, firstRepliedAt: true },
@@ -24,11 +28,11 @@ export async function overviewStats(range: ReportRange) {
       }),
       db.slaEvent.groupBy({
         by: ["target", "outcome"],
-        where: { occurredAt: { gte: range.from, lte: range.to } },
+        where: { occurredAt: { gte: range.from, lte: range.to }, ticket: { ...product } },
         _count: true,
       }),
       db.csatSurvey.aggregate({
-        where: { answeredAt: { gte: range.from, lte: range.to }, rating: { not: null } },
+        where: { answeredAt: { gte: range.from, lte: range.to }, rating: { not: null }, ticket: { ...product } },
         _avg: { rating: true },
         _count: { rating: true },
       }),
@@ -63,10 +67,14 @@ export async function overviewStats(range: ReportRange) {
 }
 
 export async function ticketsPerDay(range: ReportRange) {
+  // productId leer = alle Produkte
+  const productFilter = range.productId ?? "";
   const rows = await db.$queryRaw<{ day: Date; created: bigint; resolved: bigint }[]>`
     SELECT d.day,
-           (SELECT count(*) FROM tickets t WHERE t.created_at >= d.day AND t.created_at < d.day + interval '1 day') AS created,
-           (SELECT count(*) FROM tickets t WHERE t.resolved_at >= d.day AND t.resolved_at < d.day + interval '1 day') AS resolved
+           (SELECT count(*) FROM tickets t WHERE t.created_at >= d.day AND t.created_at < d.day + interval '1 day'
+              AND (${productFilter} = '' OR t.product_id = ${productFilter})) AS created,
+           (SELECT count(*) FROM tickets t WHERE t.resolved_at >= d.day AND t.resolved_at < d.day + interval '1 day'
+              AND (${productFilter} = '' OR t.product_id = ${productFilter})) AS resolved
     FROM generate_series(date_trunc('day', ${range.from}::timestamptz),
                          date_trunc('day', ${range.to}::timestamptz),
                          interval '1 day') AS d(day)
@@ -79,9 +87,10 @@ export async function ticketsPerDay(range: ReportRange) {
 }
 
 export async function byCategory(range: ReportRange) {
+  const product = range.productId ? { productId: range.productId } : {};
   const groups = await db.ticket.groupBy({
     by: ["categoryId"],
-    where: { createdAt: { gte: range.from, lte: range.to } },
+    where: { createdAt: { gte: range.from, lte: range.to }, ...product },
     _count: true,
   });
   const categories = await db.ticketCategory.findMany();
@@ -95,9 +104,10 @@ export async function byCategory(range: ReportRange) {
 }
 
 export async function byAgent(range: ReportRange) {
+  const product = range.productId ? { productId: range.productId } : {};
   const groups = await db.ticket.groupBy({
     by: ["assigneeId"],
-    where: { resolvedAt: { gte: range.from, lte: range.to }, assigneeId: { not: null } },
+    where: { resolvedAt: { gte: range.from, lte: range.to }, assigneeId: { not: null }, ...product },
     _count: true,
   });
   const users = await db.user.findMany();
@@ -160,7 +170,10 @@ export function toCsv(headers: string[], rows: unknown[][]): string {
 
 export async function ticketsCsv(range: ReportRange): Promise<string> {
   const tickets = await db.ticket.findMany({
-    where: { createdAt: { gte: range.from, lte: range.to } },
+    where: {
+      createdAt: { gte: range.from, lte: range.to },
+      ...(range.productId ? { productId: range.productId } : {}),
+    },
     include: { contact: true, assignee: true, category: true, slaEvents: true },
     orderBy: { number: "asc" },
   });

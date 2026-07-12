@@ -1,38 +1,65 @@
 import Link from "next/link";
 import { requireAdmin } from "@/lib/auth";
 
-const SECTIONS = [
-  { href: "/settings/users", title: "Benutzer & Teams", desc: "Agenten anlegen, Rollen und Team-Zugehörigkeit verwalten" },
-  { href: "/settings/products", title: "Produkte", desc: "Mehrere Produkte über ein Portal betreuen — Domains und Portal-Branding" },
-  { href: "/settings/mailboxes", title: "Postfächer", desc: "Support-Postfächer (IMAP/SMTP) anbinden" },
-  { href: "/settings/categories", title: "Kategorien", desc: "Ticket-Kategorien pflegen" },
-  { href: "/settings/canned", title: "Textbausteine", desc: "Vordefinierte Antworten mit Platzhaltern" },
-  { href: "/settings/macros", title: "Makros", desc: "Antwort + Status/Priorität/Tags mit einem Klick" },
-  { href: "/settings/kb", title: "Wissensdatenbank", desc: "Artikel und Kategorien für das Hilfe-Center" },
-  { href: "/settings/sla", title: "SLA & Geschäftszeiten", desc: "Reaktions- und Lösungsfristen, Feiertage" },
-  { href: "/settings/automation", title: "Automatisierung", desc: "Erstellungs- und Zeitregeln, Auto-Zuweisung" },
-  { href: "/settings/webhooks", title: "Webhooks", desc: "Ticket-Ereignisse an externe Systeme senden" },
-  { href: "/settings/backups", title: "Backups", desc: "Automatische Sicherungen als eine Datei, Download & Wiederherstellung" },
-  { href: "/settings/security", title: "Sicherheit (2FA)", desc: "Zwei-Faktor-Authentifizierung für das eigene Konto" },
+const GROUPS: { title: string; sections: { href: string; title: string; desc: string }[] }[] = [
+  {
+    title: "Verwalten",
+    sections: [
+      { href: "/settings/products", title: "Produkte", desc: "Mehrere Produkte über ein Portal — Domains, Branding, eigene Felder, Login" },
+      { href: "/settings/mailboxes", title: "Postfächer", desc: "Support-Postfächer (IMAP/SMTP) anbinden" },
+      { href: "/settings/categories", title: "Ticket-Typen", desc: "Kategorien für Anfragen pflegen" },
+      { href: "/settings/canned", title: "Textbausteine", desc: "Vordefinierte Antworten mit Platzhaltern" },
+      { href: "/settings/macros", title: "Makros", desc: "Antwort + Status/Priorität/Tags mit einem Klick" },
+    ],
+  },
+  {
+    title: "Wissensdatenbank",
+    sections: [
+      { href: "/settings/kb", title: "Artikel & Kategorien", desc: "Inhalte fürs Hilfe-Center, Icons, Sichtbarkeit" },
+    ],
+  },
+  {
+    title: "Automatisierung",
+    sections: [
+      { href: "/settings/automation", title: "Regeln", desc: "Erstellungs- und Zeitregeln, Auto-Zuweisung (Round-Robin)" },
+      { href: "/settings/sla", title: "SLA & Geschäftszeiten", desc: "Reaktions-/Lösungsfristen, Feiertage, Eskalation" },
+      { href: "/settings/webhooks", title: "Webhooks", desc: "Ticket-Ereignisse an externe Systeme senden" },
+    ],
+  },
+  {
+    title: "Benutzer & Sicherheit",
+    sections: [
+      { href: "/settings/users", title: "Benutzer & Teams", desc: "Agenten, Rollen, Team-Zugehörigkeit" },
+      { href: "/settings/security", title: "Sicherheit (2FA)", desc: "Zwei-Faktor-Authentifizierung für das eigene Konto" },
+      { href: "/settings/backups", title: "Backups", desc: "Sicherung als eine Datei, Download & Wiederherstellung, S3-Upload" },
+    ],
+  },
 ];
 
 export default async function SettingsPage() {
   await requireAdmin();
   return (
-    <div className="mx-auto max-w-2xl">
-      <h1 className="mb-4 text-lg font-semibold">Verwaltung</h1>
-      <div className="grid gap-3 sm:grid-cols-2">
-        {SECTIONS.map((s) => (
-          <Link
-            key={s.href}
-            href={s.href}
-            className="rounded-lg border border-slate-200 bg-white p-4 shadow-sm hover:border-blue-300"
-          >
-            <h2 className="font-medium">{s.title}</h2>
-            <p className="mt-1 text-sm text-slate-500">{s.desc}</p>
-          </Link>
-        ))}
-      </div>
+    <div className="mx-auto max-w-3xl space-y-8">
+      <h1 className="text-lg font-semibold">Verwaltung</h1>
+      {GROUPS.map((group) => (
+        <div key={group.title}>
+          <h2 className="mb-3 text-sm font-semibold uppercase tracking-wide text-slate-400">
+            {group.title}
+          </h2>
+          <div className="grid gap-3 sm:grid-cols-2 lg:grid-cols-3">
+            {group.sections.map((s) => (
+              <Link
+                key={s.href}
+                href={s.href}
+                className="rounded-lg border border-slate-200 bg-white p-4 shadow-sm hover:border-blue-300"
+              >
+                <h3 className="font-medium">{s.title}</h3>
+                <p className="mt-1 text-sm text-slate-500">{s.desc}</p>
+              </Link>
+            ))}
+          </div>
+        </div>
+      ))}
     </div>
   );
 }

@@ -69,22 +69,33 @@ async function toggleArticleHidden(formData: FormData) {
 export default async function KbAdminPage({
   searchParams,
 }: {
-  searchParams: Promise<{ q?: string; cat?: string; page?: string; produkt?: string }>;
+  searchParams: Promise<{ q?: string; cat?: string; page?: string; produkt?: string; ansicht?: string }>;
 }) {
-  await requireAdmin();
-  const { q, cat, page: pageParam, produkt } = await searchParams;
+  const admin = await requireAdmin();
+  const { q, cat, page: pageParam, produkt, ansicht } = await searchParams;
   const page = Math.max(1, Number(pageParam) || 1);
 
-  const where: Prisma.KbArticleWhereInput = {
+  const base: Prisma.KbArticleWhereInput = {
     ...(q?.trim() ? { title: { contains: q.trim(), mode: "insensitive" } } : {}),
     ...(cat ? { categoryId: cat } : {}),
     ...(produkt ? { productId: produkt } : {}),
   };
+  const where: Prisma.KbArticleWhereInput = {
+    ...base,
+    ...(ansicht === "meine" ? { authorId: admin.id } : {}),
+    ...(ansicht === "entwurf" ? { status: "draft" } : {}),
+    ...(ansicht === "veroeffentlicht" ? { status: "published" } : {}),
+  };
 
+  const [mineCount, draftCount, publishedCount] = await Promise.all([
+    db.kbArticle.count({ where: { ...base, authorId: admin.id } }),
+    db.kbArticle.count({ where: { ...base, status: "draft" } }),
+    db.kbArticle.count({ where: { ...base, status: "published" } }),
+  ]);
   const [articles, total, categories, products] = await Promise.all([
     db.kbArticle.findMany({
       where,
-      include: { category: true },
+      include: { category: true, author: true },
       orderBy: { title: "asc" },
       take: PAGE_SIZE,
       skip: (page - 1) * PAGE_SIZE,
@@ -186,7 +197,29 @@ export default async function KbAdminPage({
         </form>
       </div>
 
+      <div className="flex flex-wrap items-center gap-2 text-sm">
+        {[
+          { key: "", label: "Alle Artikel" },
+          { key: "meine", label: `Meine Artikel (${mineCount})` },
+          { key: "entwurf", label: `Entwürfe (${draftCount})` },
+          { key: "veroeffentlicht", label: `Veröffentlicht (${publishedCount})` },
+        ].map((tab) => (
+          <Link
+            key={tab.key}
+            href={{ query: { q, cat, produkt, ansicht: tab.key || undefined } }}
+            className={`rounded-full border px-2.5 py-1 shadow-sm ${
+              (ansicht ?? "") === tab.key
+                ? "border-blue-300 bg-blue-50 text-blue-700"
+                : "border-slate-200 bg-white hover:text-blue-700"
+            }`}
+          >
+            {tab.label}
+          </Link>
+        ))}
+      </div>
+
       <form method="GET" className="flex flex-wrap items-center gap-2">
+        {ansicht && <input type="hidden" name="ansicht" value={ansicht} />}
         <input name="q" defaultValue={q ?? ""} placeholder="Titel durchsuchen …" className="input w-72" />
         <select name="produkt" defaultValue={produkt ?? ""} className="input w-auto">
           <option value="">Alle Produkte</option>
@@ -254,7 +287,12 @@ export default async function KbAdminPage({
                   </span>
                 </td>
                 <td className="px-4 py-2 text-slate-600">{VISIBILITY_LABELS[article.visibility]}</td>
-                <td className="px-4 py-2 text-slate-500">{formatDateTime(article.updatedAt)}</td>
+                <td className="px-4 py-2 text-slate-500">
+                  {formatDateTime(article.updatedAt)}
+                  {article.author && (
+                    <span className="block text-xs text-slate-400">von {article.author.name}</span>
+                  )}
+                </td>
                 <td className="px-4 py-2 text-right">
                   <form action={toggleArticleHidden}>
                     <input type="hidden" name="id" value={article.id} />
@@ -273,12 +311,12 @@ export default async function KbAdminPage({
         <div className="flex items-center gap-2 text-sm text-slate-600">
           Seite {page} von {totalPages}
           {page > 1 && (
-            <Link className="btn-secondary" href={{ query: { q, cat, produkt, page: page - 1 } }}>
+            <Link className="btn-secondary" href={{ query: { q, cat, produkt, ansicht, page: page - 1 } }}>
               Zurück
             </Link>
           )}
           {page < totalPages && (
-            <Link className="btn-secondary" href={{ query: { q, cat, produkt, page: page + 1 } }}>
+            <Link className="btn-secondary" href={{ query: { q, cat, produkt, ansicht, page: page + 1 } }}>
               Weiter
             </Link>
           )}

@@ -1,12 +1,12 @@
 import { requireLead } from "@/lib/auth";
 import { byAgent, byCategory, kbStats, overviewStats, ticketsPerDay } from "@/server/reporting";
 
-function parseRange(params: { from?: string; to?: string }) {
+function parseRange(params: { from?: string; to?: string; produkt?: string }) {
   const to = params.to ? new Date(`${params.to}T23:59:59`) : new Date();
   const from = params.from
     ? new Date(`${params.from}T00:00:00`)
     : new Date(to.getTime() - 29 * 24 * 60 * 60 * 1000);
-  return { from, to };
+  return { from, to, productId: params.produkt || undefined };
 }
 
 function fmtHours(hours: number | null): string {
@@ -34,13 +34,16 @@ function Stat({ label, value }: { label: string; value: string }) {
 export default async function ReportsPage({
   searchParams,
 }: {
-  searchParams: Promise<{ from?: string; to?: string }>;
+  searchParams: Promise<{ from?: string; to?: string; produkt?: string }>;
 }) {
   await requireLead();
   const params = await searchParams;
   const range = parseRange(params);
-  const query = `from=${range.from.toISOString().slice(0, 10)}&to=${range.to.toISOString().slice(0, 10)}`;
+  const query = `from=${range.from.toISOString().slice(0, 10)}&to=${range.to.toISOString().slice(0, 10)}${range.productId ? `&produkt=${range.productId}` : ""}`;
 
+  const products = await (await import("@/lib/db")).db.product.findMany({
+    orderBy: [{ isDefault: "desc" }, { name: "asc" }],
+  });
   const [stats, perDay, categories, agents, kb] = await Promise.all([
     overviewStats(range),
     ticketsPerDay(range),
@@ -54,6 +57,16 @@ export default async function ReportsPage({
       <div className="flex flex-wrap items-center justify-between gap-3">
         <h1 className="text-lg font-semibold">Berichte</h1>
         <form method="GET" className="flex items-center gap-2 text-sm">
+          {products.length > 1 && (
+            <select name="produkt" defaultValue={range.productId ?? ""} className="input w-auto">
+              <option value="">Alle Produkte</option>
+              {products.map((p) => (
+                <option key={p.id} value={p.id}>
+                  {p.name}
+                </option>
+              ))}
+            </select>
+          )}
           <input
             type="date"
             name="from"

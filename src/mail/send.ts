@@ -93,6 +93,7 @@ export async function sendAgentReply(messageId: string): Promise<void> {
     const info = await smtpTransport(mailbox).sendMail({
       from: { name: fromName, address: mailbox.address },
       to: message.emailTo,
+      cc: ticket.ccEmails,
       subject: replySubject(ticket.subject, ticket.number, ticket.token),
       html,
       text,
@@ -165,6 +166,7 @@ export async function sendNotification(
     const info = await smtpTransport(mailbox).sendMail({
       from: { name: fromName, address: mailbox.address },
       to: ticket.contact.email,
+      cc: ticket.ccEmails,
       subject: tpl.subject,
       html: tpl.html,
       text: tpl.text,

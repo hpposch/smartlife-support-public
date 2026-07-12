@@ -17,15 +17,21 @@ export default async function AppLayout({ children }: { children: React.ReactNod
     <div className="min-h-screen">
       <header className="sticky top-0 z-10 border-b border-slate-200 bg-white">
         <div className="mx-auto flex h-14 max-w-7xl items-center gap-6 px-4">
-          <Link href="/tickets" className="text-sm font-semibold">
+          <Link href="/" className="text-sm font-semibold">
             SmartLife <span className="text-blue-600">Support</span>
           </Link>
           <nav className="flex items-center gap-4 text-sm text-slate-600">
+            <Link href="/" className="hover:text-slate-900">
+              Übersicht
+            </Link>
             <Link href="/tickets" className="hover:text-slate-900">
               Tickets
             </Link>
             <Link href="/tickets/new" className="hover:text-slate-900">
               Neues Ticket
+            </Link>
+            <Link href="/contacts" className="hover:text-slate-900">
+              Kontakte
             </Link>
             {(user.role === "admin" || user.role === "team_lead") && (
               <Link href="/reports" className="hover:text-slate-900">

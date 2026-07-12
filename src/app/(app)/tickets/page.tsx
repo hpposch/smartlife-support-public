@@ -60,9 +60,20 @@ interface Filters {
   priority?: string;
   assignee?: string;
   produkt?: string;
+  sla?: string;
   q?: string;
   page?: string;
 }
+
+// Eingebaute Standard-Ansichten (wie BoldDesk-Views), ergänzt um eigene
+const BUILTIN_VIEWS: { name: string; query: string }[] = [
+  { name: "Meine offenen", query: "assignee=me&status=active" },
+  { name: "Nicht zugewiesen", query: "assignee=none&status=active" },
+  { name: "Wartet auf Kunde", query: "status=pending_customer" },
+  { name: "Erstreaktion überfällig", query: "sla=response&status=active" },
+  { name: "Lösung überfällig", query: "sla=resolution&status=active" },
+  { name: "Alle ungelösten", query: "status=active" },
+];
 
 export default async function TicketListPage({
   searchParams,
@@ -85,6 +96,16 @@ export default async function TicketListPage({
   if (filters.assignee === "me") where.assigneeId = user.id;
   else if (filters.assignee === "none") where.assigneeId = null;
   if (filters.produkt) where.productId = filters.produkt;
+  const now = new Date();
+  if (filters.sla === "response") {
+    where.slaPausedAt = null;
+    where.firstRepliedAt = null;
+    where.firstResponseDueAt = { lt: now };
+  } else if (filters.sla === "resolution") {
+    where.slaPausedAt = null;
+    where.resolvedAt = null;
+    where.resolutionDueAt = { lt: now };
+  }
   if (filters.q) {
     const q = filters.q.trim();
     const asNumber = Number(q.replace(/^#/, ""));
@@ -121,9 +142,22 @@ export default async function TicketListPage({
         </h1>
       </div>
 
+      <div className="mb-3 flex flex-wrap items-center gap-2 text-sm">
+        <span className="text-xs uppercase tracking-wide text-slate-400">Ansichten:</span>
+        {BUILTIN_VIEWS.map((view) => (
+          <Link
+            key={view.name}
+            href={`/tickets?${view.query}`}
+            className="rounded-full border border-slate-200 bg-white px-2.5 py-1 shadow-sm hover:text-blue-700"
+          >
+            {view.name}
+          </Link>
+        ))}
+      </div>
+
       {views.length > 0 && (
         <div className="mb-3 flex flex-wrap items-center gap-2 text-sm">
-          <span className="text-xs uppercase tracking-wide text-slate-400">Ansichten:</span>
+          <span className="text-xs uppercase tracking-wide text-slate-400">Eigene:</span>
           {views.map((view) => {
             const params = new URLSearchParams(view.filters as Record<string, string>);
             return (

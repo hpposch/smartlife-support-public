@@ -33,6 +33,13 @@ export async function GET(
     where: { id: record.id },
     data: { usedAt: new Date() },
   });
+  // Login beweist den E-Mail-Besitz → Kontakt gilt als verifiziert
+  if (!record.contact.verifiedAt) {
+    await db.contact.update({
+      where: { id: record.contactId },
+      data: { verifiedAt: new Date() },
+    });
+  }
 
   const session = await getIronSession<PortalSessionData>(
     await cookies(),

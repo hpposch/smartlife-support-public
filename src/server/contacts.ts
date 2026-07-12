@@ -63,8 +63,9 @@ export async function findOrCreateB2cContact(
   }
 
   const contact = await findOrCreateContact(db, profile.email, profile.name);
+  // B2C-Login = Identität bestätigt → verifiziert
   return db.contact.update({
     where: { id: contact.id },
-    data: { azureB2cId: profile.objectId },
+    data: { azureB2cId: profile.objectId, verifiedAt: contact.verifiedAt ?? new Date() },
   });
 }

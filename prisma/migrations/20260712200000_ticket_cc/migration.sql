@@ -1,0 +1,1 @@
+ALTER TABLE "tickets" ADD COLUMN "cc_emails" TEXT[] NOT NULL DEFAULT ARRAY[]::TEXT[];

@@ -30,7 +30,7 @@ async function login(formData: FormData) {
   }
   session.userId = user.id;
   await session.save();
-  redirect("/tickets");
+  redirect("/");
 }
 
 export default async function LoginPage({

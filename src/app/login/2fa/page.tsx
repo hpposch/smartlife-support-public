@@ -25,7 +25,7 @@ async function confirmCode(formData: FormData) {
   session.pendingUserId = undefined;
   session.userId = user.id;
   await session.save();
-  redirect("/tickets");
+  redirect("/");
 }
 
 export default async function TwoFactorPage({
