@@ -140,3 +140,68 @@ export async function updateTicketProperties(formData: FormData) {
   revalidatePath(`/tickets/${input.ticketId}`);
   revalidatePath("/tickets");
 }
+
+/** Makro anwenden: optionale Antwort + Status/Priorität/Tags in einem Schritt. */
+export async function applyMacro(formData: FormData) {
+  const user = await requireUser();
+  const ticketId = z.string().uuid().parse(formData.get("ticketId"));
+  const macroId = String(formData.get("macroId") ?? "");
+  if (!macroId) return;
+  const { db } = await import("@/lib/db");
+  const macro = await db.macro.findUniqueOrThrow({ where: { id: macroId } });
+  if (!macro.isActive) return;
+
+  if (macro.body?.trim()) {
+    const ticket = await db.ticket.findUniqueOrThrow({
+      where: { id: ticketId },
+      include: { contact: true },
+    });
+    const body = macro.body
+      .replaceAll("{{ticket.number}}", String(ticket.number))
+      .replaceAll("{{contact.name}}", ticket.contact.name ?? "")
+      .replaceAll("{{agent.name}}", user.name);
+    const { addAgentReply } = await import("@/server/messages");
+    await addAgentReply({ ticketId, userId: user.id, bodyText: body });
+  }
+  const update: Parameters<typeof updateTicket>[1] = {};
+  if (macro.setStatus) {
+    update.status = z
+      .enum(["new", "open", "pending_customer", "pending_internal", "resolved", "closed"])
+      .parse(macro.setStatus);
+  }
+  if (macro.setPriority) {
+    update.priority = z.enum(["low", "normal", "high", "urgent"]).parse(macro.setPriority);
+  }
+  if (Object.keys(update).length > 0) {
+    await updateTicket(ticketId, update, { userId: user.id });
+  }
+  if (macro.addTags.length > 0) {
+    const existing = await db.ticketTag.findMany({
+      where: { ticketId },
+      include: { tag: true },
+    });
+    const { setTicketTags } = await import("@/server/tickets");
+    await setTicketTags(
+      ticketId,
+      [...existing.map((t) => t.tag.name), ...macro.addTags],
+      { userId: user.id }
+    );
+  }
+  revalidatePath(`/tickets/${ticketId}`);
+}
+
+/** Ticket in ein anderes (gleicher Kunde) zusammenführen. */
+export async function mergeTicketAction(formData: FormData) {
+  const user = await requireUser();
+  const ticketId = z.string().uuid().parse(formData.get("ticketId"));
+  const targetNumber = Number(String(formData.get("targetNumber")).replace(/^#/, ""));
+  if (!Number.isInteger(targetNumber) || targetNumber <= 0) return;
+  const { mergeTickets } = await import("@/server/tickets");
+  const result = await mergeTickets(ticketId, targetNumber, { userId: user.id });
+  const { redirect } = await import("next/navigation");
+  if (result.ok) {
+    redirect(`/tickets/${result.targetId}`);
+  } else {
+    redirect(`/tickets/${ticketId}?fehler=${encodeURIComponent(result.error)}`);
+  }
+}

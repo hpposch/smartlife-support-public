@@ -10,7 +10,8 @@ import {
 } from "@/lib/labels";
 import { isAiEnabled } from "@/server/ai";
 import { ReplyBox } from "./reply-box";
-import { generateAiSummary, generateKbDraft, updateTicketProperties } from "./actions";
+import { applyMacro, generateAiSummary, generateKbDraft, mergeTicketAction, updateTicketProperties } from "./actions";
+import { PresenceWarning } from "./presence-warning";
 
 function SlaDue({ dueAt, done, paused }: { dueAt: Date; done: boolean; paused: boolean }) {
   if (done) return <span className="text-emerald-600">erfüllt</span>;
@@ -32,11 +33,14 @@ const MESSAGE_STYLES: Record<string, { label: string; frame: string; badge: stri
 
 export default async function TicketDetailPage({
   params,
+  searchParams,
 }: {
   params: Promise<{ id: string }>;
+  searchParams: Promise<{ fehler?: string }>;
 }) {
   const user = await requireUser();
   const { id } = await params;
+  const { fehler } = await searchParams;
 
   const ticket = await db.ticket.findUnique({
     where: { id },
@@ -56,11 +60,12 @@ export default async function TicketDetailPage({
   });
   if (!ticket) notFound();
 
-  const [users, teams, categories, canned] = await Promise.all([
+  const [users, teams, categories, canned, macros] = await Promise.all([
     db.user.findMany({ where: { isActive: true }, orderBy: { name: "asc" } }),
     db.team.findMany({ orderBy: { name: "asc" } }),
     db.ticketCategory.findMany({ where: { isActive: true }, orderBy: { sortOrder: "asc" } }),
     db.cannedResponse.findMany({ orderBy: { title: "asc" } }),
+    db.macro.findMany({ where: { isActive: true }, orderBy: { name: "asc" } }),
   ]);
 
   return (
@@ -112,6 +117,12 @@ export default async function TicketDetailPage({
           </p>
         </div>
 
+        {fehler && (
+          <p className="mb-3 rounded-md border border-red-200 bg-red-50 px-3 py-2 text-sm text-red-700">
+            {fehler}
+          </p>
+        )}
+        <PresenceWarning ticketId={ticket.id} />
         <div className="space-y-3">
           {ticket.messages
             .filter((m) => m.type !== "system" || m.sendStatus !== "sent")
@@ -262,6 +273,46 @@ export default async function TicketDetailPage({
           <button type="submit" className="btn-primary w-full justify-center">
             Speichern
           </button>
+        </form>
+
+        {macros.length > 0 && (
+          <form
+            action={applyMacro}
+            className="rounded-lg border border-slate-200 bg-white p-4 shadow-sm"
+          >
+            <input type="hidden" name="ticketId" value={ticket.id} />
+            <h2 className="mb-2 text-sm font-semibold">Makro</h2>
+            <div className="flex gap-2">
+              <select name="macroId" required className="input">
+                <option value="">— Makro wählen —</option>
+                {macros.map((m) => (
+                  <option key={m.id} value={m.id}>
+                    {m.name}
+                  </option>
+                ))}
+              </select>
+              <button type="submit" className="btn-secondary shrink-0">
+                Anwenden
+              </button>
+            </div>
+          </form>
+        )}
+
+        <form
+          action={mergeTicketAction}
+          className="rounded-lg border border-slate-200 bg-white p-4 shadow-sm"
+        >
+          <input type="hidden" name="ticketId" value={ticket.id} />
+          <h2 className="mb-2 text-sm font-semibold">Zusammenführen</h2>
+          <p className="mb-2 text-xs text-slate-500">
+            Verschiebt alle Nachrichten in das Ziel-Ticket (gleicher Kunde) und schließt dieses.
+          </p>
+          <div className="flex gap-2">
+            <input name="targetNumber" required placeholder="#Ticketnummer" className="input" />
+            <button type="submit" className="btn-secondary shrink-0">
+              Zusammenführen
+            </button>
+          </div>
         </form>
 
         {(ticket.firstResponseDueAt || ticket.resolutionDueAt) && (

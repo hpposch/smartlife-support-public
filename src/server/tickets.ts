@@ -194,3 +194,64 @@ export async function setTicketTags(ticketId: string, tagNames: string[], actor:
 export async function enqueueTicketConfirmation(ticketId: string) {
   await queues().notify.add("ticket_confirmation", { kind: "ticket_confirmation", ticketId });
 }
+
+/**
+ * Ticket-Zusammenführung: verschiebt alle Nachrichten des Quell-Tickets in das
+ * Ziel-Ticket und schließt die Quelle. Nur innerhalb desselben Kontakts —
+ * sonst könnten Inhalte fremder Kunden im Portal sichtbar werden.
+ */
+export async function mergeTickets(
+  sourceId: string,
+  targetNumber: number,
+  actor: Actor
+): Promise<{ ok: true; targetId: string } | { ok: false; error: string }> {
+  const [source, target] = await Promise.all([
+    db.ticket.findUniqueOrThrow({ where: { id: sourceId } }),
+    db.ticket.findUnique({ where: { number: targetNumber } }),
+  ]);
+  if (!target) return { ok: false, error: `Ticket #${targetNumber} existiert nicht` };
+  if (target.id === source.id) return { ok: false, error: "Ticket kann nicht mit sich selbst zusammengeführt werden" };
+  if (target.contactId !== source.contactId) {
+    return { ok: false, error: "Zusammenführen nur bei Tickets desselben Kunden möglich" };
+  }
+  if (target.status === "closed") return { ok: false, error: "Ziel-Ticket ist geschlossen" };
+
+  await db.$transaction([
+    db.message.updateMany({ where: { ticketId: source.id }, data: { ticketId: target.id } }),
+    db.message.create({
+      data: {
+        ticketId: target.id,
+        type: "system",
+        bodyText: `Ticket #${source.number} („${source.subject}“) wurde in dieses Ticket überführt.`,
+      },
+    }),
+    db.message.create({
+      data: {
+        ticketId: source.id,
+        type: "system",
+        bodyText: `In Ticket #${target.number} zusammengeführt.`,
+      },
+    }),
+    db.ticket.update({
+      where: { id: source.id },
+      data: { status: "closed", closedAt: new Date() },
+    }),
+    db.ticketEvent.create({
+      data: {
+        ticketId: source.id,
+        eventType: "merged_into",
+        actorUserId: actor.userId,
+        payload: { targetNumber: target.number },
+      },
+    }),
+    db.ticketEvent.create({
+      data: {
+        ticketId: target.id,
+        eventType: "merged_from",
+        actorUserId: actor.userId,
+        payload: { sourceNumber: source.number },
+      },
+    }),
+  ]);
+  return { ok: true, targetId: target.id };
+}

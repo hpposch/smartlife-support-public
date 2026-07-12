@@ -82,6 +82,7 @@ model User {
   events          TicketEvent[]
   cannedResponses CannedResponse[]
   kbArticles      KbArticle[]
+  savedViews      SavedView[]
 
   @@map("users")
 }
@@ -387,7 +388,9 @@ model KbArticle {
   createdAt    DateTime     @default(now()) @map("created_at")
   updatedAt    DateTime     @default(now()) @updatedAt @map("updated_at")
   productId    String       @map("product_id")
-  // Volltextsuche: generierte tsvector-Spalte (deutsch + englisch, s. Migration)
+  // Volltextsuche: generierte tsvector-Spalte + GIN-Index (s. Migration 20260712140000).
+  // ACHTUNG: `prisma migrate diff` erzeugt dafür fälschlich DROP INDEX /
+  // ALTER COLUMN ... DROP DEFAULT — diese Statements aus neuen Migrationen entfernen!
   searchTsv    Unsupported("tsvector")? @map("search_tsv")
   // Optionale semantische Suche: Embedding-Vektor (Float32, normalisiert)
   embedding    Bytes?       @map("embedding")
@@ -516,6 +519,35 @@ model Webhook {
   createdAt    DateTime @default(now()) @map("created_at")
 
   @@map("webhooks")
+}
+
+// Gespeicherte Ticket-Ansichten (Filterkombinationen) je Agent
+model SavedView {
+  id        String   @id @default(uuid())
+  userId    String   @map("user_id")
+  name      String
+  // Query-Parameter der Ticketliste (status, priority, assignee, produkt, q)
+  filters   Json
+  createdAt DateTime @default(now()) @map("created_at")
+
+  user User @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@unique([userId, name])
+  @@map("saved_views")
+}
+
+// Makros: Antworttext + Eigenschaftsänderungen in einem Klick
+model Macro {
+  id          String  @id @default(uuid())
+  name        String  @unique
+  // Antworttext (mit Platzhaltern wie Textbausteine); leer = nur Aktionen
+  body        String?
+  setStatus   String? @map("set_status")
+  setPriority String? @map("set_priority")
+  addTags     String[] @default([]) @map("add_tags")
+  isActive    Boolean @default(true) @map("is_active")
+
+  @@map("macros")
 }
 
 model CannedResponse {

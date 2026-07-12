@@ -1,4 +1,5 @@
 import Link from "next/link";
+import { revalidatePath } from "next/cache";
 import type { Prisma, TicketPriority, TicketStatus } from "@prisma/client";
 import { requireUser } from "@/lib/auth";
 import { db } from "@/lib/db";
@@ -25,6 +26,33 @@ function isSlaOverdue(ticket: {
   if (ticket.firstResponseDueAt && !ticket.firstRepliedAt && ticket.firstResponseDueAt < now) return true;
   if (ticket.resolutionDueAt && !ticket.resolvedAt && ticket.resolutionDueAt < now) return true;
   return false;
+}
+
+async function saveView(formData: FormData) {
+  "use server";
+  const user = await requireUser();
+  const name = String(formData.get("name") ?? "").trim().slice(0, 60);
+  if (!name) return;
+  const filters: Record<string, string> = {};
+  for (const key of ["status", "priority", "assignee", "produkt", "q"]) {
+    const value = String(formData.get(`f_${key}`) ?? "");
+    if (value) filters[key] = value;
+  }
+  await db.savedView.upsert({
+    where: { userId_name: { userId: user.id, name } },
+    update: { filters },
+    create: { userId: user.id, name, filters },
+  });
+  revalidatePath("/tickets");
+}
+
+async function deleteView(formData: FormData) {
+  "use server";
+  const user = await requireUser();
+  await db.savedView.deleteMany({
+    where: { id: String(formData.get("id")), userId: user.id },
+  });
+  revalidatePath("/tickets");
 }
 
 interface Filters {
@@ -69,7 +97,7 @@ export default async function TicketListPage({
     ];
   }
 
-  const [tickets, total, products] = await Promise.all([
+  const [tickets, total, products, views] = await Promise.all([
     db.ticket.findMany({
       where,
       include: { contact: true, assignee: true, product: true, tags: { include: { tag: true } } },
@@ -79,6 +107,7 @@ export default async function TicketListPage({
     }),
     db.ticket.count({ where }),
     db.product.findMany({ orderBy: [{ isDefault: "desc" }, { name: "asc" }] }),
+    db.savedView.findMany({ where: { userId: user.id }, orderBy: { name: "asc" } }),
   ]);
   const multiProduct = products.length > 1;
 
@@ -91,6 +120,28 @@ export default async function TicketListPage({
           Tickets <span className="text-sm font-normal text-slate-500">({total})</span>
         </h1>
       </div>
+
+      {views.length > 0 && (
+        <div className="mb-3 flex flex-wrap items-center gap-2 text-sm">
+          <span className="text-xs uppercase tracking-wide text-slate-400">Ansichten:</span>
+          {views.map((view) => {
+            const params = new URLSearchParams(view.filters as Record<string, string>);
+            return (
+              <span key={view.id} className="flex items-center gap-1 rounded-full border border-slate-200 bg-white px-2.5 py-1 shadow-sm">
+                <Link href={`/tickets?${params.toString()}`} className="hover:text-blue-700">
+                  {view.name}
+                </Link>
+                <form action={deleteView}>
+                  <input type="hidden" name="id" value={view.id} />
+                  <button type="submit" className="text-slate-300 hover:text-red-600" title="Ansicht löschen">
+                    ×
+                  </button>
+                </form>
+              </span>
+            );
+          })}
+        </div>
+      )}
 
       <form className="mb-4 flex flex-wrap items-center gap-2" method="GET">
         <select name="status" defaultValue={filters.status ?? "active"} className="input w-auto">
@@ -133,6 +184,18 @@ export default async function TicketListPage({
         />
         <button type="submit" className="btn-secondary">
           Filtern
+        </button>
+      </form>
+
+      <form action={saveView} className="mb-4 flex items-center gap-2">
+        <input type="hidden" name="f_status" value={filters.status ?? ""} />
+        <input type="hidden" name="f_priority" value={filters.priority ?? ""} />
+        <input type="hidden" name="f_assignee" value={filters.assignee ?? ""} />
+        <input type="hidden" name="f_produkt" value={filters.produkt ?? ""} />
+        <input type="hidden" name="f_q" value={filters.q ?? ""} />
+        <input name="name" required placeholder="Aktuelle Filter als Ansicht speichern …" className="input w-72 text-sm" />
+        <button type="submit" className="btn-secondary text-sm">
+          Ansicht speichern
         </button>
       </form>
 
