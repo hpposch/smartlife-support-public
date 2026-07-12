@@ -1,11 +1,13 @@
 import { NextResponse } from "next/server";
 import { getIronSession } from "iron-session";
 import { cookies } from "next/headers";
-import { b2cConfig, buildAuthUrl, newFlowState, type B2cFlowState } from "@/lib/b2c";
+import { buildAuthUrl, newFlowState, oidcConfigForProduct, type B2cFlowState } from "@/lib/b2c";
 import { env } from "@/lib/env";
+import { productForHost } from "@/lib/product";
 
 export async function GET(request: Request) {
-  const config = b2cConfig();
+  const product = await productForHost(new URL(request.url).host);
+  const config = oidcConfigForProduct(product);
   if (!config) {
     return NextResponse.redirect(new URL("/portal/login?error=b2c", request.url));
   }

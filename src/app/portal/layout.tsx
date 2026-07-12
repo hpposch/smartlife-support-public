@@ -1,6 +1,6 @@
 import Link from "next/link";
 import { redirect } from "next/navigation";
-import { b2cConfig, logoutUrl } from "@/lib/b2c";
+import { logoutUrl, oidcConfigForProduct } from "@/lib/b2c";
 import { getCurrentContact, getPortalSession } from "@/lib/portal-session";
 import { currentProduct, productAccent, productLogoUrl } from "@/lib/product";
 import { isAiEnabled } from "@/server/ai";
@@ -10,8 +10,9 @@ async function portalLogout() {
   "use server";
   const session = await getPortalSession();
   session.destroy();
-  // Bei B2C zusätzlich die SSO-Session dort beenden
-  const config = b2cConfig();
+  // Bei B2C/OIDC zusätzlich die SSO-Session dort beenden
+  const { currentProduct } = await import("@/lib/product");
+  const config = oidcConfigForProduct(await currentProduct());
   if (config) {
     const url = await logoutUrl(config).catch(() => null);
     if (url) redirect(url);

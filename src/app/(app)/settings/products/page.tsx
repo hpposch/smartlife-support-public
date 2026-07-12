@@ -1,6 +1,7 @@
 // Produkte (Mehrprodukt-Betrieb): Jedes Produkt hat ein eigenes Portal-Branding
 // und optional eine eigene Domain. Tickets, Wissensdatenbank und Postfächer
 // hängen an genau einem Produkt.
+import Link from "next/link";
 import { revalidatePath } from "next/cache";
 import { Prisma } from "@prisma/client";
 import { requireAdmin } from "@/lib/auth";
@@ -42,6 +43,11 @@ async function saveProduct(formData: FormData) {
     portalUrl: normalizedUrl(formData.get("portalUrl")),
     // Standardfarbe nicht speichern — so greifen spätere Default-Anpassungen
     accentColor: /^#[0-9a-f]{6}$/.test(accentRaw) && accentRaw !== DEFAULT_ACCENT ? accentRaw : null,
+    // Eigener OIDC-Login (optional): Authority, Client-ID, Secret als ENV-Referenz
+    oidcAuthority: String(formData.get("oidcAuthority") ?? "").trim().replace(/\/$/, "") || null,
+    oidcClientId: String(formData.get("oidcClientId") ?? "").trim() || null,
+    oidcSecretRef:
+      String(formData.get("oidcSecretRef") ?? "").trim().match(/^[A-Z][A-Z0-9_]*$/)?.[0] ?? null,
     ...(logoKey ? { logoKey } : {}),
     ...(formData.get("removeLogo") === "1" ? { logoKey: null } : {}),
   };
@@ -83,7 +89,9 @@ export default async function ProductsPage() {
   await requireAdmin();
   const products = await db.product.findMany({
     orderBy: [{ isDefault: "desc" }, { name: "asc" }],
-    include: { _count: { select: { tickets: true, kbArticles: true, mailboxes: true } } },
+    include: {
+      _count: { select: { tickets: true, kbArticles: true, mailboxes: true, customFields: true } },
+    },
   });
 
   return (
@@ -133,6 +141,30 @@ export default async function ProductsPage() {
                 />
               </label>
               <label className="block text-xs font-medium text-slate-500">
+                Eigener Login: OIDC-Authority (optional)
+                <input
+                  name="oidcAuthority"
+                  defaultValue={p.oidcAuthority ?? ""}
+                  placeholder="https://…/v2.0 (leer = globales Azure B2C)"
+                  className="input mt-1"
+                />
+              </label>
+              <span className="grid grid-cols-2 gap-3">
+                <label className="block text-xs font-medium text-slate-500">
+                  OIDC-Client-ID
+                  <input name="oidcClientId" defaultValue={p.oidcClientId ?? ""} className="input mt-1" />
+                </label>
+                <label className="block text-xs font-medium text-slate-500">
+                  Secret-ENV-Variable
+                  <input
+                    name="oidcSecretRef"
+                    defaultValue={p.oidcSecretRef ?? ""}
+                    placeholder="OIDC_PLANTBEAT_SECRET"
+                    className="input mt-1"
+                  />
+                </label>
+              </span>
+              <label className="block text-xs font-medium text-slate-500">
                 Portalfarbe (Hero-Hintergrund, Buttons)
                 <input
                   name="accentColor"
@@ -171,6 +203,9 @@ export default async function ProductsPage() {
                   Als Standard setzen
                 </button>
               )}
+              <Link href={`/settings/products/${p.id}/fields`} className="text-blue-700 hover:underline">
+                Felder ({p._count.customFields})
+              </Link>
               <span className="ml-auto flex gap-3">
                 {!p.isDefault &&
                   p._count.tickets + p._count.kbArticles + p._count.mailboxes === 0 && (

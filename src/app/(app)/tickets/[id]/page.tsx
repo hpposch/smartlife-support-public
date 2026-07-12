@@ -60,6 +60,11 @@ export default async function TicketDetailPage({
   });
   if (!ticket) notFound();
 
+  const customFieldDefs = await db.customField.findMany({
+    where: { productId: ticket.productId },
+    orderBy: { sortOrder: "asc" },
+  });
+  const customValues = (ticket.customFields ?? {}) as Record<string, string>;
   const [users, teams, categories, canned, macros] = await Promise.all([
     db.user.findMany({ where: { isActive: true }, orderBy: { name: "asc" } }),
     db.team.findMany({ orderBy: { name: "asc" } }),
@@ -314,6 +319,20 @@ export default async function TicketDetailPage({
             </button>
           </div>
         </form>
+
+        {customFieldDefs.length > 0 && (
+          <div className="rounded-lg border border-slate-200 bg-white p-4 shadow-sm">
+            <h2 className="mb-2 text-sm font-semibold">Produktfelder</h2>
+            <dl className="space-y-1 text-sm">
+              {customFieldDefs.map((field) => (
+                <div key={field.id} className="flex justify-between gap-2">
+                  <dt className="text-slate-500">{field.label}</dt>
+                  <dd className="text-right font-medium">{customValues[field.key] ?? "—"}</dd>
+                </div>
+              ))}
+            </dl>
+          </div>
+        )}
 
         {(ticket.firstResponseDueAt || ticket.resolutionDueAt) && (
           <div className="rounded-lg border border-slate-200 bg-white p-4 shadow-sm">

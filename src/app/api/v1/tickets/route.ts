@@ -6,6 +6,7 @@ import { z } from "zod";
 import { db } from "@/lib/db";
 import { env } from "@/lib/env";
 import { defaultProduct } from "@/lib/product";
+import { fieldsForProduct, validateCustomFieldValues } from "@/server/custom-fields";
 import { textToHtml } from "@/lib/sanitize";
 import { findOrCreateContact } from "@/server/contacts";
 import { createTicket, enqueueTicketConfirmation, finalizeNewTicket } from "@/server/tickets";
@@ -28,6 +29,8 @@ const bodySchema = z.object({
   send_confirmation: z.boolean().optional(),
   // Produkt-Zuordnung (Mehrprodukt-Betrieb); ohne Angabe: Default-Produkt
   product: z.string().optional(),
+  // Produktspezifische Felder ({ key: wert }, s. Verwaltung → Produkte → Felder)
+  custom_fields: z.record(z.string(), z.string()).optional(),
 });
 
 export async function POST(request: NextRequest) {
@@ -66,6 +69,16 @@ export async function POST(request: NextRequest) {
     );
   }
 
+  // Custom Fields validieren (Pflichtfelder gelten auch für die API)
+  const fields = await fieldsForProduct(product.id);
+  const validated = validateCustomFieldValues(fields, input.custom_fields ?? {});
+  if (!validated.ok) {
+    return NextResponse.json(
+      { error: { code: "validation_error", message: validated.errors.join("; ") } },
+      { status: 422 }
+    );
+  }
+
   const ticket = await createTicket(
     {
       subject: input.subject,
@@ -76,6 +89,9 @@ export async function POST(request: NextRequest) {
     },
     { contactId: contact.id }
   );
+  if (Object.keys(validated.values).length > 0) {
+    await db.ticket.update({ where: { id: ticket.id }, data: { customFields: validated.values } });
+  }
   await db.message.create({
     data: {
       ticketId: ticket.id,

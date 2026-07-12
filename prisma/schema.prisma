@@ -174,13 +174,38 @@ model Product {
   // Portal-Branding: Akzent-/Hero-Farbe (Hex) und hochgeladenes Logo
   accentColor String? @map("accent_color")
   logoKey     String? @map("logo_key")
+  // Eigener OIDC-Login-Provider (optional; sonst gilt das globale Azure B2C).
+  // Secret als ENV-Referenz — kein Klartext in der DB.
+  oidcAuthority String? @map("oidc_authority")
+  oidcClientId  String? @map("oidc_client_id")
+  oidcSecretRef String? @map("oidc_secret_ref")
 
   tickets      Ticket[]
   mailboxes    Mailbox[]
   kbCategories KbCategory[]
   kbArticles   KbArticle[]
+  customFields CustomField[]
 
   @@map("products")
+}
+
+// Eigene Felder pro Produkt, die Kunden beim Erstellen einer Anfrage ausfüllen
+// (z. B. Produktversion, Umgebung). Werte liegen als JSON am Ticket.
+model CustomField {
+  id        String   @id @default(uuid())
+  productId String   @map("product_id")
+  key       String // technischer Schlüssel, z. B. "version"
+  label     String // Anzeigename, z. B. "Produktversion"
+  type      String   @default("text") // text | select | number
+  options   String[] @default([]) // Auswahloptionen bei type=select
+  required  Boolean  @default(false)
+  sortOrder Int      @default(0) @map("sort_order")
+  isActive  Boolean  @default(true) @map("is_active")
+
+  product Product @relation(fields: [productId], references: [id], onDelete: Cascade)
+
+  @@unique([productId, key])
+  @@map("custom_fields")
 }
 
 model Mailbox {
@@ -245,6 +270,9 @@ model Ticket {
   closedAt       DateTime? @map("closed_at")
   createdAt      DateTime  @default(now()) @map("created_at")
   updatedAt      DateTime  @default(now()) @updatedAt @map("updated_at")
+
+  // Werte der produktspezifischen Custom Fields ({ key: wert })
+  customFields Json? @map("custom_fields")
 
   // SLA (Phase 3): Fristen laufen in Geschäftszeiten, pausieren bei "Wartet auf Kunde"
   slaPolicyId        String?   @map("sla_policy_id")

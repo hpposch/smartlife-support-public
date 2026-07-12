@@ -1,7 +1,7 @@
 import { NextRequest, NextResponse } from "next/server";
 import { getIronSession } from "iron-session";
 import { cookies } from "next/headers";
-import { b2cConfig, exchangeCode, extractProfile, verifyIdToken, type B2cFlowState } from "@/lib/b2c";
+import { exchangeCode, extractProfile, oidcConfigForProduct, verifyIdToken, type B2cFlowState } from "@/lib/b2c";
 import { db } from "@/lib/db";
 import { env } from "@/lib/env";
 import { portalSessionOptions, type PortalSessionData } from "@/lib/portal-session";
@@ -14,7 +14,9 @@ function loginError(request: NextRequest, reason: string) {
 }
 
 export async function GET(request: NextRequest) {
-  const config = b2cConfig();
+  const { productForHost } = await import("@/lib/product");
+  const product = await productForHost(request.headers.get("host"));
+  const config = oidcConfigForProduct(product);
   if (!config) return loginError(request, "nicht konfiguriert");
 
   const ip = request.headers.get("x-forwarded-for")?.split(",")[0]?.trim() ?? "local";

@@ -55,8 +55,9 @@ export default async function PortalLoginPage({
   const contact = await getCurrentContact();
   if (contact) redirect("/portal");
 
-  const { isB2cEnabled } = await import("@/lib/b2c");
-  const b2c = isB2cEnabled();
+  const { oidcConfigForProduct } = await import("@/lib/b2c");
+  const product = await currentProduct();
+  const b2c = oidcConfigForProduct(product) !== null;
   // Magic-Link nur anbieten, wenn kein B2C konfiguriert ist — oder explizit
   // beides erlaubt wurde (PORTAL_MAGIC_LINK=true)
   const magicLink = !b2c || process.env.PORTAL_MAGIC_LINK === "true";
@@ -66,7 +67,7 @@ export default async function PortalLoginPage({
       <h1 className="mb-1 text-xl font-semibold">Supportportal</h1>
       <p className="mb-6 text-sm text-slate-500">
         {b2c
-          ? "Melden Sie sich mit Ihrem SmartLife-Kundenkonto an."
+          ? `Melden Sie sich mit Ihrem ${product.name}-Kundenkonto an.`
           : "Geben Sie Ihre E-Mail-Adresse ein — wir senden Ihnen einen Anmeldelink."}
       </p>
       {params.sent && (

@@ -44,6 +44,41 @@ export function b2cConfig(): B2cConfig | null {
 
 export const isB2cEnabled = () => b2cConfig() !== null;
 
+/**
+ * OIDC-Konfiguration eines Produkts (Verwaltung → Produkte): eigener Login-
+ * Provider pro Produkt (eigenes B2C, Entra ID, Google, Keycloak, …).
+ * Das Client-Secret liegt NICHT in der DB — oidcSecretRef benennt die
+ * ENV-Variable (wie credentialsRef bei Postfächern). Ohne Produkt-Konfiguration
+ * gilt das globale Azure B2C (b2cConfig).
+ */
+export function productOidcConfig(product: {
+  oidcAuthority: string | null;
+  oidcClientId: string | null;
+  oidcSecretRef: string | null;
+  portalUrl: string | null;
+}): B2cConfig | null {
+  if (!product.oidcAuthority || !product.oidcClientId || !product.oidcSecretRef) return null;
+  const clientSecret = process.env[product.oidcSecretRef];
+  if (!clientSecret) return null;
+  const base = (product.portalUrl ?? env.appUrl).replace(/\/$/, "");
+  return {
+    authority: product.oidcAuthority.replace(/\/$/, ""),
+    clientId: product.oidcClientId,
+    clientSecret,
+    redirectUri: `${base}/portal/auth/b2c/callback`,
+  };
+}
+
+/** Wirksame Login-Konfiguration eines Produkts: eigene, sonst globales B2C. */
+export function oidcConfigForProduct(product: {
+  oidcAuthority: string | null;
+  oidcClientId: string | null;
+  oidcSecretRef: string | null;
+  portalUrl: string | null;
+}): B2cConfig | null {
+  return productOidcConfig(product) ?? b2cConfig();
+}
+
 // ---------------------------------------------------------------------------
 // Discovery (gecacht) + JWKS
 // ---------------------------------------------------------------------------
@@ -56,32 +91,30 @@ interface OidcMetadata {
   end_session_endpoint?: string;
 }
 
-let discoveryCache: { authority: string; metadata: OidcMetadata; fetchedAt: number } | null = null;
-let jwksCache: { uri: string; jwks: ReturnType<typeof createRemoteJWKSet> } | null = null;
+// Mehrere Authorities gleichzeitig (globales B2C + produkteigene Provider)
+const discoveryCache = new Map<string, { metadata: OidcMetadata; fetchedAt: number }>();
+const jwksCache = new Map<string, ReturnType<typeof createRemoteJWKSet>>();
 
 export async function discover(config: B2cConfig): Promise<OidcMetadata> {
   const maxAgeMs = 60 * 60 * 1000;
-  if (
-    discoveryCache &&
-    discoveryCache.authority === config.authority &&
-    Date.now() - discoveryCache.fetchedAt < maxAgeMs
-  ) {
-    return discoveryCache.metadata;
-  }
+  const cached = discoveryCache.get(config.authority);
+  if (cached && Date.now() - cached.fetchedAt < maxAgeMs) return cached.metadata;
   const response = await fetch(`${config.authority}/.well-known/openid-configuration`);
   if (!response.ok) {
-    throw new Error(`B2C-Discovery fehlgeschlagen: HTTP ${response.status}`);
+    throw new Error(`OIDC-Discovery fehlgeschlagen: HTTP ${response.status}`);
   }
   const metadata = (await response.json()) as OidcMetadata;
-  discoveryCache = { authority: config.authority, metadata, fetchedAt: Date.now() };
+  discoveryCache.set(config.authority, { metadata, fetchedAt: Date.now() });
   return metadata;
 }
 
 function jwksFor(metadata: OidcMetadata) {
-  if (!jwksCache || jwksCache.uri !== metadata.jwks_uri) {
-    jwksCache = { uri: metadata.jwks_uri, jwks: createRemoteJWKSet(new URL(metadata.jwks_uri)) };
+  let jwks = jwksCache.get(metadata.jwks_uri);
+  if (!jwks) {
+    jwks = createRemoteJWKSet(new URL(metadata.jwks_uri));
+    jwksCache.set(metadata.jwks_uri, jwks);
   }
-  return jwksCache.jwks;
+  return jwks;
 }
 
 // ---------------------------------------------------------------------------
