@@ -35,8 +35,14 @@ async function main() {
 
   // --- 1) Erstellungsregel + SLA-Zuordnung ---
   const contact = await findOrCreateContact(db, `phase3-${suffix}@example.com`, "Phase3 Kunde");
+  const product = await db.product.findFirstOrThrow({ where: { isDefault: true } });
   const ticket = await createTicket(
-    { subject: `Anfrage smoketest-${suffix}`, channel: "api", contactId: contact.id },
+    {
+      subject: `Anfrage smoketest-${suffix}`,
+      channel: "api",
+      contactId: contact.id,
+      productId: product.id,
+    },
     { contactId: contact.id }
   );
   await db.message.create({

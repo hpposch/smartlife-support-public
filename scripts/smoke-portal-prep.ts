@@ -13,19 +13,21 @@ import { findOrCreateContact } from "../src/server/contacts";
 async function main() {
   const email = process.argv[2] ?? "portal-kunde@example.com";
 
+  const product = await db.product.findFirstOrThrow({ where: { isDefault: true } });
   const category = await db.kbCategory.upsert({
-    where: { slug: "erste-schritte" },
+    where: { productId_slug: { productId: product.id, slug: "erste-schritte" } },
     update: {},
-    create: { name: "Erste Schritte", slug: "erste-schritte", sortOrder: 0 },
+    create: { name: "Erste Schritte", slug: "erste-schritte", sortOrder: 0, productId: product.id },
   });
   const title = "Passwort zurücksetzen";
   await db.kbArticle.upsert({
-    where: { slug: slugify(title) },
+    where: { productId_slug: { productId: product.id, slug: slugify(title) } },
     update: { status: "published" },
     create: {
       title,
       slug: slugify(title),
       categoryId: category.id,
+      productId: product.id,
       status: "published",
       visibility: "public",
       publishedAt: new Date(),

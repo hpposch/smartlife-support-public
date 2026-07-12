@@ -122,6 +122,7 @@ export async function ingestEmail(mailbox: Mailbox, rawEmlKey: string): Promise<
         subject: cleanSubject(subjectRaw) || "(kein Betreff)",
         channel: "email",
         contactId: contact.id,
+        productId: mailbox.productId,
         teamId: mailbox.defaultTeamId,
         mailboxId: mailbox.id,
       },

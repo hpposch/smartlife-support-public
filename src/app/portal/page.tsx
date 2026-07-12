@@ -1,13 +1,16 @@
 import Link from "next/link";
 import { db } from "@/lib/db";
 import { requireContact } from "@/lib/portal-session";
+import { currentProduct } from "@/lib/product";
 import { STATUS_COLORS, STATUS_LABELS, formatRelative } from "@/lib/labels";
 
 export default async function PortalTicketsPage() {
   const contact = await requireContact();
+  const product = await currentProduct();
 
+  // Nur Anfragen des Produkts der aufgerufenen Domain
   const tickets = await db.ticket.findMany({
-    where: { contactId: contact.id },
+    where: { contactId: contact.id, productId: product.id },
     orderBy: { updatedAt: "desc" },
     take: 100,
   });

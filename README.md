@@ -111,6 +111,19 @@ Hinweise für den Betrieb mit Gmail:
 - Für die Zustellbarkeit sollten **SPF/DKIM für smartlifebi.com** in Google Workspace eingerichtet sein (Admin-Konsole → Apps → Google Workspace → Gmail → E-Mail-Authentifizierung)
 - Ändert Gmail die interne IMAP-Nummerierung (UIDVALIDITY), erkennt der Poller das und beginnt den Abruf neu — Duplikate entstehen dabei nicht (Message-ID-Schutz)
 
+### Mehrere Produkte über ein Portal (Mandanten)
+
+Eine Installation kann den Support für mehrere Produkte übernehmen — z. B. `support.smartlifebi.com` **und** `support.plantbeat.io`. Die aufgerufene **Domain entscheidet**, welches Produkt Kunden sehen: eigener Portalname, eigene Wissensdatenbank, nur die eigenen Anfragen. Tickets, KB-Artikel/-Kategorien und Postfächer hängen an genau einem Produkt; die Agenten-Oberfläche bleibt produktübergreifend (mit Produkt-Badge und -Filter in der Ticketliste).
+
+Einrichtung:
+
+1. **Verwaltung → Produkte:** neues Produkt anlegen (Anzeigename, Kürzel, Portal-Domain, Portal-URL). Ohne Domain-Treffer gilt das Standard-Produkt.
+2. **DNS/Reverse-Proxy:** beide Domains auf dieselbe Installation zeigen lassen (der Proxy muss den `Host`-Header durchreichen).
+3. **Postfach** des Produkts anbinden (Verwaltung → Postfächer, Produkt wählen) — eingehende Mails an dieses Postfach werden dem Produkt zugeordnet.
+4. **Wissensdatenbank** pro Produkt füllen: Import mit `--product <kürzel>` (s. unten), oder Artikel manuell mit Produktauswahl anlegen.
+
+Produktbezogen sind außerdem: Absendername („\<Produkt\> Support") und Signatur in Kunden-Mails, Magic-Link-/CSAT-Links (Portal-URL des Produkts), Chat-Assistent (antwortet nur aus der KB des jeweiligen Produkts, Tickets landen im richtigen Produkt) und `POST /api/v1/tickets` (optionales Feld `product` mit dem Kürzel). Hinweis: Der Azure-B2C-Login ist auf die Redirect-URI der Haupt-Domain registriert — auf weiteren Produkt-Domains steht der Magic-Link-Login zur Verfügung (`PORTAL_MAGIC_LINK=true`, Standard ohne B2C).
+
 ### Wissensdatenbank: Bold-BI-Doku importieren (Rebranding auf smartlife BI)
 
 Importiert alle ~890 Artikel aus [boldbi/bold-bi-docs](https://github.com/boldbi/bold-bi-docs) in das Hilfe-Center — inkl. Bilder, Kategorien und umgeschriebener interner Links. Dabei wird durchgängig **„Bold BI" → „smartlife BI"** und **„Syncfusion" → „smartlife"** ersetzt (anpassbar über die Konstanten am Skriptanfang).
@@ -120,6 +133,8 @@ Voraussetzung für den lokalen Lauf: eingerichtete Entwicklungsumgebung (`npm in
 ```bash
 git clone --depth 1 https://github.com/boldbi/bold-bi-docs.git /tmp/bold-bi-docs
 npx tsx scripts/import-boldbi-docs.ts /tmp/bold-bi-docs
+# Mehrprodukt-Betrieb: Ziel-Produkt wählen (Standard: Default-Produkt)
+npx tsx scripts/import-boldbi-docs.ts /tmp/bold-bi-docs --product smartlifebi
 ```
 
 - Bilder (~300 MB) landen in `DATA_DIR/kb-assets` und werden über `/kb-assets/…` ausgeliefert (damit auch im Backup enthalten)

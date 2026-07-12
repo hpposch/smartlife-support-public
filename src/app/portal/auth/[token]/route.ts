@@ -2,7 +2,6 @@ import { NextRequest, NextResponse } from "next/server";
 import { getIronSession } from "iron-session";
 import { cookies } from "next/headers";
 import { db } from "@/lib/db";
-import { env } from "@/lib/env";
 import { hashPortalToken } from "@/lib/portal-token";
 import { rateLimit } from "@/lib/ratelimit";
 import { portalSessionOptions, type PortalSessionData } from "@/lib/portal-session";
@@ -13,7 +12,7 @@ export async function GET(
 ) {
   const ip = request.headers.get("x-forwarded-for")?.split(",")[0]?.trim() ?? "local";
   const { allowed } = await rateLimit("portal-auth-ip", ip, { max: 20, windowSeconds: 900 });
-  if (!allowed) return NextResponse.redirect(new URL("/portal/login?error=1", env.appUrl));
+  if (!allowed) return NextResponse.redirect(new URL("/portal/login?error=1", request.url));
 
   const { token } = await params;
   const record = await db.portalLoginToken.findUnique({
@@ -28,7 +27,7 @@ export async function GET(
     !record.contact.isBlocked &&
     !record.contact.anonymizedAt;
 
-  if (!valid) return NextResponse.redirect(new URL("/portal/login?error=1", env.appUrl));
+  if (!valid) return NextResponse.redirect(new URL("/portal/login?error=1", request.url));
 
   await db.portalLoginToken.update({
     where: { id: record.id },
@@ -42,5 +41,5 @@ export async function GET(
   session.contactId = record.contactId;
   await session.save();
 
-  return NextResponse.redirect(new URL("/portal", env.appUrl));
+  return NextResponse.redirect(new URL("/portal", request.url));
 }

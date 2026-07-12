@@ -4,10 +4,10 @@ import { cookies } from "next/headers";
 import { b2cConfig, buildAuthUrl, newFlowState, type B2cFlowState } from "@/lib/b2c";
 import { env } from "@/lib/env";
 
-export async function GET() {
+export async function GET(request: Request) {
   const config = b2cConfig();
   if (!config) {
-    return NextResponse.redirect(new URL("/portal/login?error=b2c", env.appUrl));
+    return NextResponse.redirect(new URL("/portal/login?error=b2c", request.url));
   }
 
   const flow = newFlowState();

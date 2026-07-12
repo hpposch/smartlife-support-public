@@ -9,6 +9,13 @@ async function main() {
   const adminEmail = (process.env.SEED_ADMIN_EMAIL ?? "admin@smartlife.software").toLowerCase();
   const adminPassword = process.env.SEED_ADMIN_PASSWORD ?? "admin1234";
 
+  // Default-Produkt (Mehrprodukt-Betrieb: weitere unter Verwaltung → Produkte)
+  await db.product.upsert({
+    where: { key: "smartlifebi" },
+    update: {},
+    create: { key: "smartlifebi", name: "smartlife BI", isDefault: true },
+  });
+
   const team = await db.team.upsert({
     where: { name: "Support" },
     update: {},

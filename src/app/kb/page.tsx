@@ -2,6 +2,7 @@ import Link from "next/link";
 import type { Prisma } from "@prisma/client";
 import { db } from "@/lib/db";
 import { getCurrentContact } from "@/lib/portal-session";
+import { currentProduct } from "@/lib/product";
 
 export default async function KbHomePage({
   searchParams,
@@ -10,6 +11,7 @@ export default async function KbHomePage({
 }) {
   const { q, kategorie } = await searchParams;
   const contact = await getCurrentContact();
+  const product = await currentProduct();
 
   // Öffentliche Artikel für alle; "customers" zusätzlich für eingeloggte Kunden
   const visibility: Prisma.KbArticleWhereInput = contact
@@ -17,12 +19,13 @@ export default async function KbHomePage({
     : { visibility: "public" };
   const base: Prisma.KbArticleWhereInput = {
     status: "published",
+    productId: product.id,
     ...visibility,
     OR: [{ categoryId: null }, { category: { isHidden: false } }],
   };
 
   const categories = await db.kbCategory.findMany({
-    where: { isHidden: false },
+    where: { isHidden: false, productId: product.id },
     orderBy: [{ sortOrder: "asc" }, { name: "asc" }],
     include: { _count: { select: { articles: { where: { status: "published", ...visibility } } } } },
   });

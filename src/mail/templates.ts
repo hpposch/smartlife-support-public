@@ -8,10 +8,16 @@ interface TicketInfo {
   token: string;
   subject: string;
   contactName?: string | null;
+  // Produktname für Anrede/Signatur in Kunden-Mails (Mehrprodukt-Betrieb)
+  productName?: string;
 }
 
 function layout(body: string): string {
   return `<div style="font-family:system-ui,-apple-system,sans-serif;font-size:15px;color:#1f2937;line-height:1.6">${body}</div>`;
+}
+
+function teamSignature(productName?: string): string {
+  return `Ihr ${productName ?? "SmartLife"}-Support-Team`;
 }
 
 export function ticketConfirmation(t: TicketInfo) {
@@ -23,30 +29,30 @@ export function ticketConfirmation(t: TicketInfo) {
        <p>vielen Dank für Ihre Anfrage. Wir haben sie unter der Ticketnummer
        <strong>#${t.number}</strong> aufgenommen und melden uns so schnell wie möglich.</p>
        <p>Antworten Sie einfach auf diese E-Mail, um Ihrer Anfrage etwas hinzuzufügen.</p>
-       <p>Ihr SmartLife-Support-Team</p>`
+       <p>${teamSignature(t.productName)}</p>`
     ),
-    text: `${greeting}\n\nvielen Dank für Ihre Anfrage. Wir haben sie unter der Ticketnummer #${t.number} aufgenommen und melden uns so schnell wie möglich.\n\nAntworten Sie einfach auf diese E-Mail, um Ihrer Anfrage etwas hinzuzufügen.\n\nIhr SmartLife-Support-Team`,
+    text: `${greeting}\n\nvielen Dank für Ihre Anfrage. Wir haben sie unter der Ticketnummer #${t.number} aufgenommen und melden uns so schnell wie möglich.\n\nAntworten Sie einfach auf diese E-Mail, um Ihrer Anfrage etwas hinzuzufügen.\n\n${teamSignature(t.productName)}`,
   };
 }
 
-export function portalLogin(contactName: string | null, loginUrl: string) {
+export function portalLogin(contactName: string | null, loginUrl: string, productName?: string) {
   const greeting = contactName ? `Hallo ${contactName},` : "Hallo,";
   return {
-    subject: "Ihr Anmeldelink für das SmartLife-Supportportal",
+    subject: `Ihr Anmeldelink für das ${productName ?? "SmartLife"}-Supportportal`,
     html: layout(
       `<p>${greeting}</p>
        <p>mit diesem Link melden Sie sich im Supportportal an (30 Minuten gültig):</p>
        <p><a href="${loginUrl}">Jetzt anmelden</a></p>
        <p>Falls Sie diese E-Mail nicht angefordert haben, können Sie sie ignorieren.</p>
-       <p>Ihr SmartLife-Support-Team</p>`
+       <p>${teamSignature(productName)}</p>`
     ),
-    text: `${greeting}\n\nmit diesem Link melden Sie sich im Supportportal an (30 Minuten gültig):\n\n${loginUrl}\n\nFalls Sie diese E-Mail nicht angefordert haben, können Sie sie ignorieren.\n\nIhr SmartLife-Support-Team`,
+    text: `${greeting}\n\nmit diesem Link melden Sie sich im Supportportal an (30 Minuten gültig):\n\n${loginUrl}\n\nFalls Sie diese E-Mail nicht angefordert haben, können Sie sie ignorieren.\n\n${teamSignature(productName)}`,
   };
 }
 
-export function csatSurvey(t: TicketInfo, token: string) {
+export function csatSurvey(t: TicketInfo, token: string, portalBase?: string) {
   const greeting = t.contactName ? `Hallo ${t.contactName},` : "Hallo,";
-  const base = `${env.appUrl}/csat/${token}`;
+  const base = `${portalBase ?? env.appUrl}/csat/${token}`;
   const stars = [1, 2, 3, 4, 5]
     .map(
       (n) =>
@@ -60,9 +66,9 @@ export function csatSurvey(t: TicketInfo, token: string) {
        <p>Ihre Anfrage <strong>„${t.subject}“</strong> wurde gelöst. Wie zufrieden
        waren Sie mit unserem Support? (1 = unzufrieden, 5 = sehr zufrieden)</p>
        <p style="text-align:center;margin:20px 0">${stars}</p>
-       <p>Vielen Dank!<br/>Ihr SmartLife-Support-Team</p>`
+       <p>Vielen Dank!<br/>${teamSignature(t.productName)}</p>`
     ),
-    text: `${greeting}\n\nIhre Anfrage „${t.subject}“ wurde gelöst. Wie zufrieden waren Sie mit unserem Support? (1 = unzufrieden, 5 = sehr zufrieden)\n\nBewerten: ${base}\n\nVielen Dank!\nIhr SmartLife-Support-Team`,
+    text: `${greeting}\n\nIhre Anfrage „${t.subject}“ wurde gelöst. Wie zufrieden waren Sie mit unserem Support? (1 = unzufrieden, 5 = sehr zufrieden)\n\nBewerten: ${base}\n\nVielen Dank!\n${teamSignature(t.productName)}`,
   };
 }
 

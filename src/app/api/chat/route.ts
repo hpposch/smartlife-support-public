@@ -2,6 +2,7 @@
 // Stateless: der Client hält den Verlauf, hier wird nur geantwortet.
 import { NextRequest, NextResponse } from "next/server";
 import { z } from "zod";
+import { productForHost } from "@/lib/product";
 import { rateLimit } from "@/lib/ratelimit";
 import { isAiEnabled } from "@/server/ai";
 import { assistantReply, CHAT_LIMITS } from "@/server/chat-assistant";
@@ -51,7 +52,8 @@ export async function POST(request: NextRequest) {
   }
 
   try {
-    const result = await assistantReply(parsed.data.messages);
+    const product = await productForHost(request.headers.get("host"));
+    const result = await assistantReply(parsed.data.messages, product.id);
     return NextResponse.json({ data: result });
   } catch (error) {
     console.error("[chat] Antwort fehlgeschlagen:", error);

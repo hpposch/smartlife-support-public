@@ -13,13 +13,17 @@ const schema = z.object({
   categoryId: z.string(),
   status: z.enum(["draft", "published", "archived"]),
   visibility: z.enum(["public", "customers", "internal"]),
+  productId: z.string().min(1),
 });
 
-async function uniqueSlug(title: string, existingId?: string): Promise<string> {
+// Slugs sind pro Produkt eindeutig
+async function uniqueSlug(title: string, productId: string, existingId?: string): Promise<string> {
   const base = slugify(title);
   let slug = base;
   for (let i = 2; ; i++) {
-    const clash = await db.kbArticle.findUnique({ where: { slug } });
+    const clash = await db.kbArticle.findUnique({
+      where: { productId_slug: { productId, slug } },
+    });
     if (!clash || clash.id === existingId) return slug;
     slug = `${base}-${i}`;
   }
@@ -34,6 +38,7 @@ export async function saveArticle(formData: FormData) {
     categoryId: formData.get("categoryId") ?? "",
     status: formData.get("status"),
     visibility: formData.get("visibility"),
+    productId: formData.get("productId"),
   });
 
   const data = {
@@ -42,6 +47,7 @@ export async function saveArticle(formData: FormData) {
     categoryId: input.categoryId || null,
     status: input.status,
     visibility: input.visibility,
+    productId: input.productId,
   };
 
   if (input.id) {
@@ -50,7 +56,7 @@ export async function saveArticle(formData: FormData) {
       where: { id: input.id },
       data: {
         ...data,
-        slug: await uniqueSlug(input.title, input.id),
+        slug: await uniqueSlug(input.title, input.productId, input.id),
         publishedAt:
           input.status === "published" && !existing.publishedAt
             ? new Date()
@@ -62,7 +68,7 @@ export async function saveArticle(formData: FormData) {
     const article = await db.kbArticle.create({
       data: {
         ...data,
-        slug: await uniqueSlug(input.title),
+        slug: await uniqueSlug(input.title, input.productId),
         authorId: admin.id,
         publishedAt: input.status === "published" ? new Date() : null,
       },

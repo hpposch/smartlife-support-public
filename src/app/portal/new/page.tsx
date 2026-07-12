@@ -2,6 +2,7 @@ import { redirect } from "next/navigation";
 import { z } from "zod";
 import { db } from "@/lib/db";
 import { requireContact } from "@/lib/portal-session";
+import { currentProduct } from "@/lib/product";
 import { textToHtml } from "@/lib/sanitize";
 import { createTicket, enqueueTicketConfirmation, finalizeNewTicket } from "@/server/tickets";
 
@@ -20,11 +21,13 @@ async function createPortalTicket(formData: FormData) {
     categoryId: formData.get("categoryId") ?? "",
   });
 
+  const product = await currentProduct();
   const ticket = await createTicket(
     {
       subject: input.subject,
       channel: "portal",
       contactId: contact.id,
+      productId: product.id,
       categoryId: input.categoryId || null,
     },
     { contactId: contact.id }

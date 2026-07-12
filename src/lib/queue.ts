@@ -57,7 +57,7 @@ function createQueues() {
 export type NotifyJob =
   | { kind: "ticket_confirmation"; ticketId: string }
   | { kind: "agent_new_message"; ticketId: string; messageId: string }
-  | { kind: "portal_login"; contactId: string; token: string }
+  | { kind: "portal_login"; contactId: string; token: string; productId?: string }
   | { kind: "csat"; ticketId: string }
   | { kind: "sla_breach"; ticketId: string; target: "first_response" | "resolution" };
 

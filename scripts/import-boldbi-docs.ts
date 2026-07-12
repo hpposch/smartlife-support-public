@@ -3,7 +3,8 @@
 //   "Syncfusion" → smartlife
 //
 //   git clone --depth 1 https://github.com/boldbi/bold-bi-docs.git /tmp/bold-bi-docs
-//   npx tsx scripts/import-boldbi-docs.ts /tmp/bold-bi-docs [--limit N] [--dry-run] [--prune]
+//   npx tsx scripts/import-boldbi-docs.ts /tmp/bold-bi-docs [--limit N] [--dry-run] [--prune] [--product <key>]
+//   --product: Ziel-Produkt (Mehrprodukt-Betrieb); ohne Angabe das Default-Produkt
 //
 // Der Import ist idempotent (Slug aus dem Dateipfad): erneutes Ausführen
 // aktualisiert bestehende Artikel. Bilder werden in die Datei-Ablage kopiert
@@ -146,6 +147,23 @@ async function main() {
   const dryRun = process.argv.includes("--dry-run");
   const prune = process.argv.includes("--prune");
 
+  // Ziel-Produkt: --product <key>, sonst Default-Produkt
+  const productArg = process.argv.indexOf("--product");
+  const productKey = productArg > -1 ? process.argv[productArg + 1] : null;
+  const product = productKey
+    ? await db.product.findUnique({ where: { key: productKey } })
+    : ((await db.product.findFirst({ where: { isDefault: true } })) ??
+      (await db.product.findFirst({ orderBy: { key: "asc" } })));
+  if (!product) {
+    console.error(
+      productKey
+        ? `Unbekanntes Produkt: ${productKey} (unter Verwaltung → Produkte anlegen)`
+        : "Kein Produkt vorhanden — erst `npm run db:seed` ausführen"
+    );
+    process.exit(1);
+  }
+  console.log(`Ziel-Produkt: ${product.name} (${product.key})`);
+
   const { readdir } = await import("node:fs/promises");
   async function walk(dir: string): Promise<string[]> {
     const entries = await readdir(path.join(repoDir, dir), { withFileTypes: true });
@@ -192,9 +210,9 @@ async function main() {
   for (const doc of parsed) {
     if (!categoryIds.has(doc.category) && !dryRun) {
       const cat = await db.kbCategory.upsert({
-        where: { slug: slugify(doc.category) },
+        where: { productId_slug: { productId: product.id, slug: slugify(doc.category) } },
         update: {},
-        create: { name: doc.category, slug: slugify(doc.category) },
+        create: { name: doc.category, slug: slugify(doc.category), productId: product.id },
       });
       categoryIds.set(doc.category, cat.id);
     }
@@ -207,15 +225,18 @@ async function main() {
     );
 
     if (dryRun) continue;
-    const existing = await db.kbArticle.findUnique({ where: { slug: doc.slug } });
+    const existing = await db.kbArticle.findUnique({
+      where: { productId_slug: { productId: product.id, slug: doc.slug } },
+    });
     await db.kbArticle.upsert({
-      where: { slug: doc.slug },
+      where: { productId_slug: { productId: product.id, slug: doc.slug } },
       update: { title: doc.title, bodyMarkdown, categoryId: categoryIds.get(doc.category) },
       create: {
         slug: doc.slug,
         title: doc.title,
         bodyMarkdown,
         categoryId: categoryIds.get(doc.category),
+        productId: product.id,
         status: "published",
         visibility: "public",
         publishedAt: new Date(),
@@ -253,6 +274,7 @@ async function main() {
   if (!dryRun && limit === Infinity) {
     const currentSlugs = new Set(parsed.map((doc) => doc.slug));
     const imported = await db.kbArticle.findMany({
+      where: { productId: product.id },
       select: { id: true, slug: true, title: true },
     });
     const orphans = imported.filter(
@@ -274,7 +296,9 @@ async function main() {
 
   // Leere Kategorien entfernen (z. B. nach Umbenennungen aus früheren Läufen)
   if (!dryRun) {
-    const removed = await db.kbCategory.deleteMany({ where: { articles: { none: {} } } });
+    const removed = await db.kbCategory.deleteMany({
+      where: { productId: product.id, articles: { none: {} } },
+    });
     if (removed.count > 0) console.log(`${removed.count} leere Kategorie(n) entfernt`);
   }
 

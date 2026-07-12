@@ -14,9 +14,10 @@ export default async function EditArticlePage({
   await requireAdmin();
   const { id } = await params;
   const { saved } = await searchParams;
-  const [article, categories] = await Promise.all([
+  const [article, categories, products] = await Promise.all([
     db.kbArticle.findUnique({ where: { id } }),
     db.kbCategory.findMany({ orderBy: { sortOrder: "asc" } }),
+    db.product.findMany({ orderBy: [{ isDefault: "desc" }, { name: "asc" }] }),
   ]);
   if (!article) notFound();
 
@@ -28,7 +29,7 @@ export default async function EditArticlePage({
           Gespeichert.
         </p>
       )}
-      <ArticleForm article={article} categories={categories} action={saveArticle} />
+      <ArticleForm article={article} categories={categories} products={products} action={saveArticle} />
     </div>
   );
 }

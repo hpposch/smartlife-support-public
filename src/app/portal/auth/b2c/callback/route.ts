@@ -8,27 +8,27 @@ import { portalSessionOptions, type PortalSessionData } from "@/lib/portal-sessi
 import { rateLimit } from "@/lib/ratelimit";
 import { findOrCreateB2cContact } from "@/server/contacts";
 
-function loginError(reason: string) {
+function loginError(request: NextRequest, reason: string) {
   console.error(`[b2c] Login fehlgeschlagen: ${reason}`);
-  return NextResponse.redirect(new URL("/portal/login?error=b2c", env.appUrl));
+  return NextResponse.redirect(new URL("/portal/login?error=b2c", request.url));
 }
 
 export async function GET(request: NextRequest) {
   const config = b2cConfig();
-  if (!config) return loginError("nicht konfiguriert");
+  if (!config) return loginError(request, "nicht konfiguriert");
 
   const ip = request.headers.get("x-forwarded-for")?.split(",")[0]?.trim() ?? "local";
   const { allowed } = await rateLimit("b2c-callback-ip", ip, { max: 30, windowSeconds: 900 });
-  if (!allowed) return loginError("Rate-Limit");
+  if (!allowed) return loginError(request, "Rate-Limit");
 
   const params = request.nextUrl.searchParams;
   if (params.get("error")) {
     // z. B. Nutzer bricht den B2C-Dialog ab (access_denied)
-    return NextResponse.redirect(new URL("/portal/login", env.appUrl));
+    return NextResponse.redirect(new URL("/portal/login", request.url));
   }
   const code = params.get("code");
   const state = params.get("state");
-  if (!code || !state) return loginError("code/state fehlt");
+  if (!code || !state) return loginError(request, "code/state fehlt");
 
   const flow = await getIronSession<B2cFlowState>(await cookies(), {
     cookieName: "smartlife_b2c_flow",
@@ -39,7 +39,7 @@ export async function GET(request: NextRequest) {
       secure: process.env.NODE_ENV === "production",
     },
   });
-  if (!flow.state || flow.state !== state) return loginError("State ungültig");
+  if (!flow.state || flow.state !== state) return loginError(request, "State ungültig");
 
   try {
     const { idToken } = await exchangeCode(config, code, flow.verifier);
@@ -47,7 +47,7 @@ export async function GET(request: NextRequest) {
     const profile = extractProfile(payload);
 
     const contact = await findOrCreateB2cContact(db, profile);
-    if (contact.isBlocked || contact.anonymizedAt) return loginError("Kontakt gesperrt");
+    if (contact.isBlocked || contact.anonymizedAt) return loginError(request, "Kontakt gesperrt");
 
     flow.destroy();
     const session = await getIronSession<PortalSessionData>(
@@ -57,8 +57,8 @@ export async function GET(request: NextRequest) {
     session.contactId = contact.id;
     await session.save();
 
-    return NextResponse.redirect(new URL("/portal", env.appUrl));
+    return NextResponse.redirect(new URL("/portal", request.url));
   } catch (error) {
-    return loginError(String(error));
+    return loginError(request, String(error));
   }
 }

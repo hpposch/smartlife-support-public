@@ -40,12 +40,14 @@ async function ingest(raw: Buffer, mailboxId: string) {
 async function main() {
   process.env.SMOKE_MAILBOX_PASSWORD = "unused";
   const suffix = Math.random().toString(36).slice(2, 8);
+  const product = await db.product.findFirstOrThrow({ where: { isDefault: true } });
   const mailbox = await db.mailbox.create({
     data: {
       name: "Smoke-Test",
       address: `smoke-${suffix}@example.com`,
       credentialsRef: "SMOKE_MAILBOX_PASSWORD",
       isActive: false, // kein IMAP-Poll
+      productId: product.id,
     },
   });
   const customer = `kunde-${suffix}@example.com`;

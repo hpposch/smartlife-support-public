@@ -5,6 +5,7 @@ import { NextRequest, NextResponse } from "next/server";
 import { z } from "zod";
 import { db } from "@/lib/db";
 import { env } from "@/lib/env";
+import { defaultProduct } from "@/lib/product";
 import { textToHtml } from "@/lib/sanitize";
 import { findOrCreateContact } from "@/server/contacts";
 import { createTicket, enqueueTicketConfirmation, finalizeNewTicket } from "@/server/tickets";
@@ -25,6 +26,8 @@ const bodySchema = z.object({
   contact_name: z.string().optional(),
   priority: z.enum(["low", "normal", "high", "urgent"]).optional(),
   send_confirmation: z.boolean().optional(),
+  // Produkt-Zuordnung (Mehrprodukt-Betrieb); ohne Angabe: Default-Produkt
+  product: z.string().optional(),
 });
 
 export async function POST(request: NextRequest) {
@@ -53,11 +56,22 @@ export async function POST(request: NextRequest) {
     );
   }
 
+  const product = input.product
+    ? await db.product.findUnique({ where: { key: input.product } })
+    : await defaultProduct();
+  if (!product) {
+    return NextResponse.json(
+      { error: { code: "unknown_product", message: `Unbekanntes Produkt: ${input.product}` } },
+      { status: 422 }
+    );
+  }
+
   const ticket = await createTicket(
     {
       subject: input.subject,
       channel: "api",
       contactId: contact.id,
+      productId: product.id,
       priority: input.priority,
     },
     { contactId: contact.id }

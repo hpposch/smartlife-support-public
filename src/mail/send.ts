@@ -3,7 +3,7 @@
 // Speicherung der versendeten Message-ID für eingehendes Threading.
 import type Mail from "nodemailer/lib/mailer";
 import { db } from "@/lib/db";
-import { env } from "@/lib/env";
+import { defaultProduct, productPortalUrl } from "@/lib/product";
 import { readStoredFile } from "@/lib/storage";
 import { replySubject } from "@/lib/ticket-token";
 import { smtpTransport } from "./mailer";
@@ -31,12 +31,15 @@ async function threadingHeaders(ticketId: string) {
 async function loadMailboxForTicket(ticketId: string) {
   const ticket = await db.ticket.findUniqueOrThrow({
     where: { id: ticketId },
-    include: { mailbox: true, contact: true, team: true },
+    include: { mailbox: true, contact: true, team: true, product: true },
   });
+  // Bevorzugt das Postfach des Tickets, dann eines des Produkts, dann irgendein aktives
   const mailbox =
-    ticket.mailbox ?? (await db.mailbox.findFirst({ where: { isActive: true } }));
+    ticket.mailbox ??
+    (await db.mailbox.findFirst({ where: { isActive: true, productId: ticket.productId } })) ??
+    (await db.mailbox.findFirst({ where: { isActive: true } }));
   if (!mailbox) throw new Error("Kein aktives Postfach für den Versand konfiguriert");
-  return { ticket, mailbox };
+  return { ticket, mailbox, fromName: `${ticket.product.name} Support` };
 }
 
 /** Agentenantwort (messages.send_status = pending) versenden. */
@@ -47,7 +50,7 @@ export async function sendAgentReply(messageId: string): Promise<void> {
   });
   if (message.type !== "agent_reply" || message.sendStatus === "sent") return;
 
-  const { ticket, mailbox } = await loadMailboxForTicket(message.ticketId);
+  const { ticket, mailbox, fromName } = await loadMailboxForTicket(message.ticketId);
   const headers = await threadingHeaders(ticket.id);
 
   const attachments: Mail.Attachment[] = await Promise.all(
@@ -64,7 +67,7 @@ export async function sendAgentReply(messageId: string): Promise<void> {
 
   try {
     const info = await smtpTransport(mailbox).sendMail({
-      from: { name: `SmartLife Support`, address: mailbox.address },
+      from: { name: fromName, address: mailbox.address },
       to: message.emailTo,
       subject: replySubject(ticket.subject, ticket.number, ticket.token),
       html,
@@ -96,19 +99,25 @@ export async function sendNotification(
   job:
     | { kind: "ticket_confirmation" | "agent_new_message" | "csat"; ticketId: string; messageId?: string }
     | { kind: "sla_breach"; ticketId: string; target: "first_response" | "resolution" }
-    | { kind: "portal_login"; contactId: string; token: string }
+    | { kind: "portal_login"; contactId: string; token: string; productId?: string }
 ): Promise<void> {
   if (job.kind === "portal_login") {
+    const product = job.productId
+      ? await db.product.findUniqueOrThrow({ where: { id: job.productId } })
+      : await defaultProduct();
     const [contact, mailbox] = await Promise.all([
       db.contact.findUniqueOrThrow({ where: { id: job.contactId } }),
-      db.mailbox.findFirst({ where: { isActive: true } }),
+      db.mailbox
+        .findFirst({ where: { isActive: true, productId: product.id } })
+        .then((m) => m ?? db.mailbox.findFirst({ where: { isActive: true } })),
     ]);
     if (!mailbox) throw new Error("Kein aktives Postfach für den Versand konfiguriert");
     if (contact.isBlocked || contact.anonymizedAt) return;
-    const url = `${env.appUrl}/portal/auth/${job.token}`;
-    const tpl = templates.portalLogin(contact.name, url);
+    // Der Link führt auf die Domain des Produkts, von dem der Login angefordert wurde
+    const url = `${productPortalUrl(product)}/portal/auth/${job.token}`;
+    const tpl = templates.portalLogin(contact.name, url, product.name);
     await smtpTransport(mailbox).sendMail({
-      from: { name: "SmartLife Support", address: mailbox.address },
+      from: { name: `${product.name} Support`, address: mailbox.address },
       to: contact.email,
       subject: tpl.subject,
       html: tpl.html,
@@ -117,7 +126,7 @@ export async function sendNotification(
     return;
   }
 
-  const { ticket, mailbox } = await loadMailboxForTicket(job.ticketId);
+  const { ticket, mailbox, fromName } = await loadMailboxForTicket(job.ticketId);
 
   if (job.kind === "ticket_confirmation") {
     if (ticket.contact.isBlocked) return;
@@ -126,10 +135,11 @@ export async function sendNotification(
       token: ticket.token,
       subject: ticket.subject,
       contactName: ticket.contact.name,
+      productName: ticket.product.name,
     });
     const headers = await threadingHeaders(ticket.id);
     const info = await smtpTransport(mailbox).sendMail({
-      from: { name: "SmartLife Support", address: mailbox.address },
+      from: { name: fromName, address: mailbox.address },
       to: ticket.contact.email,
       subject: tpl.subject,
       html: tpl.html,
@@ -161,11 +171,13 @@ export async function sendNotification(
         token: ticket.token,
         subject: ticket.subject,
         contactName: ticket.contact.name,
+        productName: ticket.product.name,
       },
-      survey.token
+      survey.token,
+      productPortalUrl(ticket.product)
     );
     await smtpTransport(mailbox).sendMail({
-      from: { name: "SmartLife Support", address: mailbox.address },
+      from: { name: fromName, address: mailbox.address },
       to: ticket.contact.email,
       subject: tpl.subject,
       html: tpl.html,
@@ -197,7 +209,7 @@ export async function sendNotification(
       dueAt ?? new Date()
     );
     await smtpTransport(mailbox).sendMail({
-      from: { name: "SmartLife Support", address: mailbox.address },
+      from: { name: fromName, address: mailbox.address },
       to: recipients,
       subject: tpl.subject,
       html: tpl.html,
@@ -220,7 +232,7 @@ export async function sendNotification(
       (message?.bodyText ?? "").slice(0, 300)
     );
     await smtpTransport(mailbox).sendMail({
-      from: { name: "SmartLife Support", address: mailbox.address },
+      from: { name: fromName, address: mailbox.address },
       to: assignee.email,
       subject: tpl.subject,
       html: tpl.html,

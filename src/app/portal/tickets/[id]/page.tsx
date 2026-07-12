@@ -3,12 +3,14 @@ import { revalidatePath } from "next/cache";
 import { z } from "zod";
 import { db } from "@/lib/db";
 import { requireContact } from "@/lib/portal-session";
+import { currentProduct } from "@/lib/product";
 import { STATUS_COLORS, STATUS_LABELS, formatDateTime } from "@/lib/labels";
 import { addCustomerMessage } from "@/server/messages";
 import { updateTicket } from "@/server/tickets";
 
 async function loadOwnTicket(ticketId: string) {
   const contact = await requireContact();
+  const product = await currentProduct();
   const ticket = await db.ticket.findUnique({
     where: { id: ticketId },
     include: {
@@ -20,7 +22,8 @@ async function loadOwnTicket(ticketId: string) {
       },
     },
   });
-  if (!ticket || ticket.contactId !== contact.id) notFound();
+  // Nur eigene Tickets des Produkts der aufgerufenen Domain
+  if (!ticket || ticket.contactId !== contact.id || ticket.productId !== product.id) notFound();
   return { contact, ticket };
 }
 

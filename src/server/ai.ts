@@ -87,13 +87,14 @@ async function buildTicketContext(ticketId: string) {
   return { ticket, transcript };
 }
 
-/** Passende veröffentlichte KB-Artikel per Stichwortsuche auf dem Betreff. */
-async function findRelevantKbArticles(subject: string, limit = 3) {
+/** Passende veröffentlichte KB-Artikel (des Produkts) per Stichwortsuche auf dem Betreff. */
+async function findRelevantKbArticles(subject: string, productId: string, limit = 3) {
   const keywords = extractKeywords(subject);
   if (keywords.length === 0) return [];
   return db.kbArticle.findMany({
     where: {
       status: "published",
+      productId,
       AND: [{ OR: [{ categoryId: null }, { category: { isHidden: false } }] }],
       OR: keywords.flatMap((kw) => [
         { title: { contains: kw, mode: "insensitive" as const } },
@@ -110,7 +111,7 @@ async function findRelevantKbArticles(subject: string, limit = 3) {
 
 export async function draftReply(ticketId: string): Promise<string> {
   const { ticket, transcript } = await buildTicketContext(ticketId);
-  const articles = await findRelevantKbArticles(ticket.subject);
+  const articles = await findRelevantKbArticles(ticket.subject, ticket.productId);
 
   const kbContext =
     articles.length > 0

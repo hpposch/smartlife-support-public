@@ -50,10 +50,13 @@ export interface AssistantResult {
   suggestedSubject: string | null;
 }
 
-export async function assistantReply(history: ChatMessage[]): Promise<AssistantResult> {
+export async function assistantReply(
+  history: ChatMessage[],
+  productId: string
+): Promise<AssistantResult> {
   const chat = clampChat(history);
 
-  // Passende KB-Artikel zu den letzten Nutzer-Nachrichten suchen
+  // Passende KB-Artikel (des Produkts) zu den letzten Nutzer-Nachrichten suchen
   const userText = chat
     .filter((m) => m.role === "user")
     .slice(-2)
@@ -66,6 +69,7 @@ export async function assistantReply(history: ChatMessage[]): Promise<AssistantR
           where: {
             status: "published",
             visibility: "public",
+            productId,
             AND: [{ OR: [{ categoryId: null }, { category: { isHidden: false } }] }],
             OR: keywords.flatMap((kw) => [
               { title: { contains: kw, mode: "insensitive" as const } },

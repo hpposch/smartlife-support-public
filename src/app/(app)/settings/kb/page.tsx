@@ -14,10 +14,11 @@ async function createCategory(formData: FormData) {
   "use server";
   await requireAdmin();
   const name = String(formData.get("name") ?? "").trim();
-  if (!name) return;
+  const productId = String(formData.get("productId") ?? "");
+  if (!name || !productId) return;
   const max = await db.kbCategory.aggregate({ _max: { sortOrder: true } });
   await db.kbCategory.create({
-    data: { name, slug: slugify(name), sortOrder: (max._max.sortOrder ?? 0) + 1 },
+    data: { name, slug: slugify(name), productId, sortOrder: (max._max.sortOrder ?? 0) + 1 },
   });
   revalidatePath("/settings/kb");
 }
@@ -52,18 +53,19 @@ async function toggleArticleHidden(formData: FormData) {
 export default async function KbAdminPage({
   searchParams,
 }: {
-  searchParams: Promise<{ q?: string; cat?: string; page?: string }>;
+  searchParams: Promise<{ q?: string; cat?: string; page?: string; produkt?: string }>;
 }) {
   await requireAdmin();
-  const { q, cat, page: pageParam } = await searchParams;
+  const { q, cat, page: pageParam, produkt } = await searchParams;
   const page = Math.max(1, Number(pageParam) || 1);
 
   const where: Prisma.KbArticleWhereInput = {
     ...(q?.trim() ? { title: { contains: q.trim(), mode: "insensitive" } } : {}),
     ...(cat ? { categoryId: cat } : {}),
+    ...(produkt ? { productId: produkt } : {}),
   };
 
-  const [articles, total, categories] = await Promise.all([
+  const [articles, total, categories, products] = await Promise.all([
     db.kbArticle.findMany({
       where,
       include: { category: true },
@@ -73,9 +75,11 @@ export default async function KbAdminPage({
     }),
     db.kbArticle.count({ where }),
     db.kbCategory.findMany({
+      where: produkt ? { productId: produkt } : undefined,
       orderBy: [{ sortOrder: "asc" }, { name: "asc" }],
-      include: { _count: { select: { articles: true } } },
+      include: { _count: { select: { articles: true } }, product: true },
     }),
+    db.product.findMany({ orderBy: [{ isDefault: "desc" }, { name: "asc" }] }),
   ]);
   const totalPages = Math.max(1, Math.ceil(total / PAGE_SIZE));
 
@@ -107,6 +111,9 @@ export default async function KbAdminPage({
             >
               <span className={category.isHidden ? "line-through" : ""}>
                 {category.name} ({category._count.articles})
+                {products.length > 1 && (
+                  <span className="ml-1 text-slate-400">· {category.product.name}</span>
+                )}
               </span>
               <form action={toggleCategoryHidden}>
                 <input type="hidden" name="id" value={category.id} />
@@ -120,6 +127,13 @@ export default async function KbAdminPage({
         </ul>
         <form action={createCategory} className="flex gap-2">
           <input name="name" required placeholder="Neue Kategorie" className="input max-w-xs" />
+          <select name="productId" required className="input w-auto">
+            {products.map((p) => (
+              <option key={p.id} value={p.id}>
+                {p.name}
+              </option>
+            ))}
+          </select>
           <button type="submit" className="btn-secondary shrink-0">
             Hinzufügen
           </button>
@@ -128,6 +142,14 @@ export default async function KbAdminPage({
 
       <form method="GET" className="flex flex-wrap items-center gap-2">
         <input name="q" defaultValue={q ?? ""} placeholder="Titel durchsuchen …" className="input w-72" />
+        <select name="produkt" defaultValue={produkt ?? ""} className="input w-auto">
+          <option value="">Alle Produkte</option>
+          {products.map((p) => (
+            <option key={p.id} value={p.id}>
+              {p.name}
+            </option>
+          ))}
+        </select>
         <select name="cat" defaultValue={cat ?? ""} className="input w-auto">
           <option value="">Alle Kategorien</option>
           {categories.map((category) => (
@@ -205,12 +227,12 @@ export default async function KbAdminPage({
         <div className="flex items-center gap-2 text-sm text-slate-600">
           Seite {page} von {totalPages}
           {page > 1 && (
-            <Link className="btn-secondary" href={{ query: { q, cat, page: page - 1 } }}>
+            <Link className="btn-secondary" href={{ query: { q, cat, produkt, page: page - 1 } }}>
               Zurück
             </Link>
           )}
           {page < totalPages && (
-            <Link className="btn-secondary" href={{ query: { q, cat, page: page + 1 } }}>
+            <Link className="btn-secondary" href={{ query: { q, cat, produkt, page: page + 1 } }}>
               Weiter
             </Link>
           )}

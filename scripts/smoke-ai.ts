@@ -50,9 +50,10 @@ async function main() {
   );
   const { assistantReply } = await import("../src/server/chat-assistant");
 
+  const product = await db.product.findFirstOrThrow({ where: { isDefault: true } });
   async function makeTicket(contactId: string, subject: string, bodyText: string) {
     const ticket = await createTicket(
-      { subject, channel: "api", contactId },
+      { subject, channel: "api", contactId, productId: product.id },
       { contactId }
     );
     await db.message.create({
@@ -113,6 +114,7 @@ async function main() {
         subject: `Zweite Anfrage ${suffix}`,
         channel: "api",
         contactId: contact.id,
+        productId: product.id,
         categoryId: (await db.ticketCategory.findFirstOrThrow({ where: { name: { not: "Abrechnung" } } })).id,
       },
       { contactId: contact.id }
@@ -153,14 +155,16 @@ async function main() {
     assert.equal(classified3.priority, "high", "OpenAI: Priorität angehoben");
     console.log("✓ OpenAI-Provider: strukturierte Klassifizierung (response_format json_schema)");
 
-    const chatProblem = await assistantReply([
-      { role: "user", text: "Meine Dashboard-Anzeige funktioniert nicht, ich habe ein Problem." },
-    ]);
+    const chatProblem = await assistantReply(
+      [{ role: "user", text: "Meine Dashboard-Anzeige funktioniert nicht, ich habe ein Problem." }],
+      product.id
+    );
     assert.equal(chatProblem.offerTicket, true, "OpenAI: Chat bietet Ticket an");
     assert.ok(chatProblem.reply.includes("[Stub]"), "OpenAI: Chat-Antwort kommt aus der API");
-    const chatQuestion = await assistantReply([
-      { role: "user", text: "Wie erstelle ich ein Dashboard?" },
-    ]);
+    const chatQuestion = await assistantReply(
+      [{ role: "user", text: "Wie erstelle ich ein Dashboard?" }],
+      product.id
+    );
     assert.equal(chatQuestion.offerTicket, false, "OpenAI: normale Frage ohne Ticket-Angebot");
     assert.ok(chatQuestion.replyHtml.includes("/kb/"), "OpenAI: Antwort verlinkt KB-Artikel");
     console.log("✓ OpenAI-Provider: Chat-Assistent (Antwort + Ticket-Angebot)");

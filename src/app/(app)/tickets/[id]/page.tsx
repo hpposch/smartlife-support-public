@@ -45,6 +45,7 @@ export default async function TicketDetailPage({
       assignee: true,
       team: true,
       category: true,
+      product: true,
       tags: { include: { tag: true } },
       messages: {
         orderBy: { createdAt: "asc" },
@@ -91,6 +92,10 @@ export default async function TicketDetailPage({
           <p className="mt-1 text-sm text-slate-500">
             {ticket.contact.name ?? ticket.contact.email}
             {ticket.contact.organization && ` · ${ticket.contact.organization.name}`}
+            {" · "}
+            <span className="rounded bg-indigo-50 px-1.5 py-0.5 text-xs text-indigo-700">
+              {ticket.product.name}
+            </span>
             {" · "}erstellt am {formatDateTime(ticket.createdAt)}
           </p>
         </div>

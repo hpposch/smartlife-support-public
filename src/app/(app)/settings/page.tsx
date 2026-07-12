@@ -3,6 +3,7 @@ import { requireAdmin } from "@/lib/auth";
 
 const SECTIONS = [
   { href: "/settings/users", title: "Benutzer & Teams", desc: "Agenten anlegen, Rollen und Team-Zugehörigkeit verwalten" },
+  { href: "/settings/products", title: "Produkte", desc: "Mehrere Produkte über ein Portal betreuen — Domains und Portal-Branding" },
   { href: "/settings/mailboxes", title: "Postfächer", desc: "Support-Postfächer (IMAP/SMTP) anbinden" },
   { href: "/settings/categories", title: "Kategorien", desc: "Ticket-Kategorien pflegen" },
   { href: "/settings/canned", title: "Textbausteine", desc: "Vordefinierte Antworten mit Platzhaltern" },

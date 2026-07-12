@@ -7,6 +7,7 @@ import {
   hashPortalToken,
   portalTokenExpiry,
 } from "@/lib/portal-token";
+import { currentProduct } from "@/lib/product";
 import { queues } from "@/lib/queue";
 import { rateLimit } from "@/lib/ratelimit";
 import { findOrCreateContact } from "@/server/contacts";
@@ -33,10 +34,12 @@ async function requestLoginLink(formData: FormData) {
           expiresAt: portalTokenExpiry(),
         },
       });
+      const product = await currentProduct();
       await queues().notify.add("portal_login", {
         kind: "portal_login",
         contactId: contact.id,
         token,
+        productId: product.id,
       });
     }
   }

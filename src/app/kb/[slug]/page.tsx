@@ -4,6 +4,7 @@ import { db } from "@/lib/db";
 import { formatDateTime } from "@/lib/labels";
 import { renderMarkdown } from "@/lib/markdown";
 import { getCurrentContact } from "@/lib/portal-session";
+import { currentProduct } from "@/lib/product";
 
 export default async function KbArticlePage({
   params,
@@ -12,9 +13,10 @@ export default async function KbArticlePage({
 }) {
   const { slug } = await params;
   const contact = await getCurrentContact();
+  const product = await currentProduct();
 
   const article = await db.kbArticle.findUnique({
-    where: { slug },
+    where: { productId_slug: { productId: product.id, slug } },
     include: { category: true },
   });
   if (!article || article.status !== "published") notFound();

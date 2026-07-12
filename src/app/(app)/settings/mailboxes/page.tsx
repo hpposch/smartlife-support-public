@@ -15,6 +15,7 @@ const schema = z.object({
   credentialsRef: z
     .string()
     .regex(/^[A-Z][A-Z0-9_]*$/, "Name einer ENV-Variable, z. B. MAILBOX_SUPPORT_PASSWORD"),
+  productId: z.string().min(1),
 });
 
 async function createMailbox(formData: FormData) {
@@ -39,7 +40,10 @@ async function toggleMailbox(formData: FormData) {
 
 export default async function MailboxesPage() {
   await requireAdmin();
-  const mailboxes = await db.mailbox.findMany({ orderBy: { address: "asc" } });
+  const [mailboxes, products] = await Promise.all([
+    db.mailbox.findMany({ orderBy: { address: "asc" }, include: { product: true } }),
+    db.product.findMany({ orderBy: [{ isDefault: "desc" }, { name: "asc" }] }),
+  ]);
 
   return (
     <div className="mx-auto max-w-3xl space-y-6">
@@ -73,6 +77,7 @@ export default async function MailboxesPage() {
           <thead>
             <tr className="border-b border-slate-200 text-left text-xs uppercase text-slate-500">
               <th className="px-4 py-2">Adresse</th>
+              <th className="px-4 py-2">Produkt</th>
               <th className="px-4 py-2">IMAP</th>
               <th className="px-4 py-2">SMTP</th>
               <th className="px-4 py-2">Status</th>
@@ -82,7 +87,7 @@ export default async function MailboxesPage() {
           <tbody>
             {mailboxes.length === 0 && (
               <tr>
-                <td colSpan={5} className="px-4 py-8 text-center text-slate-400">
+                <td colSpan={6} className="px-4 py-8 text-center text-slate-400">
                   Noch kein Postfach angebunden.
                 </td>
               </tr>
@@ -90,6 +95,7 @@ export default async function MailboxesPage() {
             {mailboxes.map((mb) => (
               <tr key={mb.id} className="border-b border-slate-100 last:border-0">
                 <td className="px-4 py-2 font-medium">{mb.address}</td>
+                <td className="px-4 py-2 text-slate-600">{mb.product.name}</td>
                 <td className="px-4 py-2 text-slate-600">
                   {mb.imapHost}:{mb.imapPort}
                 </td>
@@ -131,6 +137,13 @@ export default async function MailboxesPage() {
           <input name="smtpHost" required placeholder="SMTP-Host (Gmail: smtp.gmail.com)" className="input" />
           <input name="smtpPort" type="number" defaultValue={587} required placeholder="SMTP-Port" className="input" />
           <input name="smtpUser" required placeholder="SMTP-Benutzer" className="input" />
+          <select name="productId" required className="input" title="Produkt: Mails an dieses Postfach werden diesem Produkt zugeordnet">
+            {products.map((p) => (
+              <option key={p.id} value={p.id}>
+                Produkt: {p.name}
+              </option>
+            ))}
+          </select>
           <input
             name="credentialsRef"
             required

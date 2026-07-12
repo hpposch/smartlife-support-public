@@ -5,6 +5,7 @@ import { NextRequest, NextResponse } from "next/server";
 import { z } from "zod";
 import { db } from "@/lib/db";
 import { getCurrentContact } from "@/lib/portal-session";
+import { productForHost } from "@/lib/product";
 import { rateLimit } from "@/lib/ratelimit";
 import { textToHtml } from "@/lib/sanitize";
 import { findOrCreateContact } from "@/server/contacts";
@@ -73,9 +74,10 @@ export async function POST(request: NextRequest) {
     );
   }
 
+  const product = await productForHost(request.headers.get("host"));
   const transcript = formatTranscript(clampChat(input.messages));
   const ticket = await createTicket(
-    { subject: input.subject, channel: "chat", contactId: contact.id },
+    { subject: input.subject, channel: "chat", contactId: contact.id, productId: product.id },
     { contactId: contact.id }
   );
   await db.message.create({

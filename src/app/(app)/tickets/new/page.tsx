@@ -14,6 +14,7 @@ const schema = z.object({
   body: z.string().min(1),
   priority: z.enum(["low", "normal", "high", "urgent"]),
   categoryId: z.string(),
+  productId: z.string().min(1),
 });
 
 async function createManualTicket(formData: FormData) {
@@ -26,6 +27,7 @@ async function createManualTicket(formData: FormData) {
     body: formData.get("body"),
     priority: formData.get("priority"),
     categoryId: formData.get("categoryId") ?? "",
+    productId: formData.get("productId"),
   });
 
   const contact = await findOrCreateContact(db, input.email, input.name || null);
@@ -34,6 +36,7 @@ async function createManualTicket(formData: FormData) {
       subject: input.subject,
       channel: "manual",
       contactId: contact.id,
+      productId: input.productId,
       priority: input.priority,
       categoryId: input.categoryId || null,
       assigneeId: user.id,
@@ -49,10 +52,10 @@ async function createManualTicket(formData: FormData) {
 
 export default async function NewTicketPage() {
   await requireUser();
-  const categories = await db.ticketCategory.findMany({
-    where: { isActive: true },
-    orderBy: { sortOrder: "asc" },
-  });
+  const [categories, products] = await Promise.all([
+    db.ticketCategory.findMany({ where: { isActive: true }, orderBy: { sortOrder: "asc" } }),
+    db.product.findMany({ orderBy: [{ isDefault: "desc" }, { name: "asc" }] }),
+  ]);
 
   return (
     <div className="mx-auto max-w-xl">
@@ -75,6 +78,16 @@ export default async function NewTicketPage() {
             <input name="name" className="input mt-1" />
           </label>
         </div>
+        <label className="block text-xs font-medium text-slate-500">
+          Produkt *
+          <select name="productId" required className="input mt-1">
+            {products.map((p) => (
+              <option key={p.id} value={p.id}>
+                {p.name}
+              </option>
+            ))}
+          </select>
+        </label>
         <label className="block text-xs font-medium text-slate-500">
           Betreff *
           <input name="subject" required className="input mt-1" />

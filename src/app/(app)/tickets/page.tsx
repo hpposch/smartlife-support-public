@@ -31,6 +31,7 @@ interface Filters {
   status?: string;
   priority?: string;
   assignee?: string;
+  produkt?: string;
   q?: string;
   page?: string;
 }
@@ -55,6 +56,7 @@ export default async function TicketListPage({
   }
   if (filters.assignee === "me") where.assigneeId = user.id;
   else if (filters.assignee === "none") where.assigneeId = null;
+  if (filters.produkt) where.productId = filters.produkt;
   if (filters.q) {
     const q = filters.q.trim();
     const asNumber = Number(q.replace(/^#/, ""));
@@ -67,16 +69,18 @@ export default async function TicketListPage({
     ];
   }
 
-  const [tickets, total] = await Promise.all([
+  const [tickets, total, products] = await Promise.all([
     db.ticket.findMany({
       where,
-      include: { contact: true, assignee: true, tags: { include: { tag: true } } },
+      include: { contact: true, assignee: true, product: true, tags: { include: { tag: true } } },
       orderBy: { updatedAt: "desc" },
       take: PAGE_SIZE,
       skip: (page - 1) * PAGE_SIZE,
     }),
     db.ticket.count({ where }),
+    db.product.findMany({ orderBy: [{ isDefault: "desc" }, { name: "asc" }] }),
   ]);
+  const multiProduct = products.length > 1;
 
   const totalPages = Math.max(1, Math.ceil(total / PAGE_SIZE));
 
@@ -111,6 +115,16 @@ export default async function TicketListPage({
           <option value="me">Mir zugewiesen</option>
           <option value="none">Nicht zugewiesen</option>
         </select>
+        {multiProduct && (
+          <select name="produkt" defaultValue={filters.produkt ?? ""} className="input w-auto">
+            <option value="">Alle Produkte</option>
+            {products.map((p) => (
+              <option key={p.id} value={p.id}>
+                {p.name}
+              </option>
+            ))}
+          </select>
+        )}
         <input
           name="q"
           defaultValue={filters.q ?? ""}
@@ -153,6 +167,11 @@ export default async function TicketListPage({
                   >
                     {ticket.subject}
                   </Link>
+                  {multiProduct && (
+                    <span className="ml-2 rounded bg-indigo-50 px-1.5 py-0.5 text-xs text-indigo-700">
+                      {ticket.product.name}
+                    </span>
+                  )}
                   {ticket.tags.length > 0 && (
                     <span className="ml-2 space-x-1">
                       {ticket.tags.map(({ tag }) => (

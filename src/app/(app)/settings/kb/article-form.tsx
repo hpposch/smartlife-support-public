@@ -1,15 +1,19 @@
-import type { KbArticle, KbCategory } from "@prisma/client";
+import type { KbArticle, KbCategory, Product } from "@prisma/client";
 
 /** Gemeinsames Formular für Neu & Bearbeiten (Server-Komponente). */
 export function ArticleForm({
   article,
   categories,
+  products,
   action,
 }: {
   article?: KbArticle;
   categories: KbCategory[];
+  products: Product[];
   action: (formData: FormData) => Promise<void>;
 }) {
+  const defaultProductId =
+    article?.productId ?? (products.find((p) => p.isDefault) ?? products[0])?.id;
   return (
     <form
       action={action}
@@ -20,7 +24,17 @@ export function ArticleForm({
         Titel *
         <input name="title" required defaultValue={article?.title} className="input mt-1" />
       </label>
-      <div className="grid gap-3 sm:grid-cols-3">
+      <div className="grid gap-3 sm:grid-cols-4">
+        <label className="block text-xs font-medium text-slate-500">
+          Produkt *
+          <select name="productId" defaultValue={defaultProductId} required className="input mt-1">
+            {products.map((p) => (
+              <option key={p.id} value={p.id}>
+                {p.name}
+              </option>
+            ))}
+          </select>
+        </label>
         <label className="block text-xs font-medium text-slate-500">
           Kategorie
           <select name="categoryId" defaultValue={article?.categoryId ?? ""} className="input mt-1">

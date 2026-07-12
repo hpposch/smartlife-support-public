@@ -12,6 +12,7 @@ interface CreateTicketInput {
   subject: string;
   channel: TicketChannel;
   contactId: string;
+  productId: string;
   priority?: TicketPriority;
   teamId?: string | null;
   mailboxId?: string | null;
@@ -28,6 +29,7 @@ export async function createTicket(input: CreateTicketInput, actor: Actor) {
       token: generateTicketToken(),
       channel: input.channel,
       priority: input.priority ?? "normal",
+      productId: input.productId,
       contactId: contact.id,
       organizationId: contact.organizationId,
       teamId: input.teamId ?? null,
