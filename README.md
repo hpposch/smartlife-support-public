@@ -69,7 +69,37 @@ Die Entscheidung für den Eigenbau ist dann sinnvoll, wenn tiefe Produktintegrat
 - ✅ **Auto-Klassifizierung:** Neue Tickets werden im Worker automatisch klassifiziert — Kategorie (nur wenn leer, Regeln haben Vorrang), Prioritätsanhebung bei Dringlichkeit, Tag „verärgert“ bei negativer Stimmung; jede Änderung im Audit-Log
 - ✅ **Chat-Assistent** in Hilfe-Center und Portal: schwebendes Chat-Widget, beantwortet Fragen auf Basis der Wissensdatenbank (mit Artikel-Links) und bietet bei Bedarf die Ticket-Erstellung an — das Ticket enthält den kompletten Chatverlauf (Kanal `chat`); anonyme Besucher geben ihre E-Mail an, eingeloggte Kunden werden übernommen; Rate-Limits gegen Missbrauch
 - ✅ **Zwei Provider zur Wahl** (siehe `.env.example`): **Claude API** — `ANTHROPIC_API_KEY` setzen (Modell: `claude-opus-4-8`, via `AI_MODEL` änderbar) — **oder eine beliebige OpenAI-kompatible API** (OpenAI, Azure OpenAI, OpenRouter, LiteLLM, Ollama, vLLM …) über `AI_BASE_URL` + `AI_API_KEY` + `AI_MODEL`. Strukturierte Ausgaben nutzen dort `response_format: json_schema`; Server ohne diesen Support bekommen automatisch einen zweiten Versuch mit Schema im Prompt. Ist keine der Varianten konfiguriert, sind alle KI-Funktionen (inkl. Chat-Widget) ausgeblendet — das System läuft vollständig ohne
-- ⬜ Restliche P2/P3-Punkte: Custom Fields, gespeicherte Ansichten, Merge, Kollisionserkennung, Makros, Englisch
+- ⬜ Offen: englische Oberfläche (Portal/Agenten-UI sind derzeit deutsch)
+
+## Weitere Funktionen (Ausbaustufe Juli 2026)
+
+**Kunden & Portal**
+
+- **Anhänge**: Datei-Uploads bei neuer Anfrage und Antworten im Portal sowie bei der Ticket-Erstellung aus dem Chat (max. 5 Dateien à 10 MB; ausführbare Dateien werden abgelehnt)
+- **Artikel-Feedback & Suchstatistik**: „War dieser Artikel hilfreich?“ (anonym) am Artikelende; alle Hilfe-Center-Suchen werden protokolliert — die Berichte zeigen schlecht bewertete Artikel und die häufigsten **Suchen ohne Treffer** (Doku-Lücken)
+- **Bessere Suche**: Postgres-Volltextsuche (deutsch + englisch, Ranking) für Hilfe-Center, Chat-Assistent und KI-Entwürfe; mit OpenAI-kompatiblem Provider zusätzlich **semantische Suche** über Embeddings (`AI_EMBEDDING_MODEL`, Indexierung automatisch im Worker und nach dem Doku-Import)
+- **Custom Fields pro Produkt** (*Verwaltung → Produkte → Felder*): Text/Auswahl/Zahl, optional Pflicht — werden im Portal-Formular abgefragt, am Ticket angezeigt und von der API (`custom_fields`) validiert
+- **Eigener Login pro Produkt**: generische OIDC-Konfiguration je Produkt (Authority, Client-ID, Secret als ENV-Referenz) für eigenes Azure B2C, Entra ID, Google u. a.; ohne Produkt-Konfiguration gilt das globale Azure B2C
+
+**Kanäle**
+
+- **Einbettbares Kontaktformular**: `<iframe src="https://support.…/embed/form?product=<kürzel>" style="width:100%;height:420px;border:0"></iframe>` — mit Honeypot + Rate-Limit, Bestätigungsmail an den Kunden
+- **WhatsApp Business (Cloud API)**: eingehende Nachrichten werden Tickets (Kanal `whatsapp`, Kontakt über Telefonnummer, offene Konversation wird weitergeführt), Agentenantworten gehen als WhatsApp-Nachricht zurück (24-h-Fenster der Cloud API beachten). Einrichtung: Meta-App mit WhatsApp-Produkt, Webhook-URL `https://…/api/whatsapp/webhook` + `WHATSAPP_VERIFY_TOKEN`, dann `WHATSAPP_TOKEN`/`WHATSAPP_PHONE_NUMBER_ID` in der `.env`
+
+**Agenten-Produktivität**
+
+- **Gespeicherte Ansichten** (Filter-Chips über der Ticketliste, pro Agent), **Makros** (*Verwaltung → Makros*: Antwort + Status/Priorität/Tags in einem Klick), **Ticket-Zusammenführen** (nur gleicher Kunde; Quelle wird geschlossen, alles im Audit-Log) und **Kollisionswarnung** (Banner, wenn Kolleg:innen dasselbe Ticket geöffnet haben)
+- **✨ KB-Artikel** am Ticket: KI destilliert den gelösten Fall zu einem anonymisierten Wissensdatenbank-Entwurf im Produkt des Tickets
+
+**DSGVO**
+
+- **Datenauskunft** (JSON-Export) und **unwiderrufliche Anonymisierung** pro Kontakt (Ticket-Seitenleiste → „Datenschutz“); **Aufbewahrungsfrist** `RETENTION_ANONYMIZE_DAYS` schwärzt Inhalte lange geschlossener Tickets automatisch
+
+**Betrieb & Sicherheit**
+
+- **Monitoring**: `/api/health` meldet zusätzlich Worker-/Mail-Abruf-Heartbeats (`status: degraded`); bei stehendem Postfach-Abruf geht eine Alert-Mail an `ALERT_EMAIL` (max. alle 6 h)
+- **2FA (TOTP)** für Agenten (🔒 im Kopfbereich bzw. *Verwaltung → Sicherheit*): QR-Code für Authenticator-Apps, zweiter Login-Schritt
+- **Backup-Upload zu S3-kompatiblem Speicher** (`S3_BACKUP_BUCKET` + Zugangsdaten): jedes Backup wird zusätzlich hochgeladen; lokale Rotation bleibt
 
 ## Entwicklung starten
 

@@ -50,6 +50,30 @@ export async function sendAgentReply(messageId: string): Promise<void> {
   });
   if (message.type !== "agent_reply" || message.sendStatus === "sent") return;
 
+  // WhatsApp-Tickets: Antwort als WhatsApp-Nachricht statt E-Mail
+  const ticketMeta = await db.ticket.findUniqueOrThrow({
+    where: { id: message.ticketId },
+    include: { contact: true },
+  });
+  if (ticketMeta.channel === "whatsapp" && ticketMeta.contact.phone) {
+    const { isWhatsappEnabled, sendWhatsappMessage } = await import("@/server/whatsapp");
+    if (!isWhatsappEnabled()) throw new Error("WhatsApp ist nicht konfiguriert");
+    try {
+      const waId = await sendWhatsappMessage(ticketMeta.contact.phone, message.bodyText);
+      await db.message.update({
+        where: { id: message.id },
+        data: { sendStatus: "sent", sendError: null, emailMessageId: waId },
+      });
+    } catch (error) {
+      await db.message.update({
+        where: { id: message.id },
+        data: { sendStatus: "failed", sendError: String(error).slice(0, 1000) },
+      });
+      throw error;
+    }
+    return;
+  }
+
   const { ticket, mailbox, fromName } = await loadMailboxForTicket(message.ticketId);
   const headers = await threadingHeaders(ticket.id);
 

@@ -27,6 +27,13 @@ async function main() {
   await queues().timeRules.upsertJobScheduler("time-rules", { every: 15 * 60_000 });
   // Embeddings für neue/geänderte KB-Artikel (wirkt nur mit OpenAI-kompatiblem Provider)
   await queues().kbIndex.upsertJobScheduler("kb-index", { every: 10 * 60_000 });
+  // Betriebs-Monitoring: Alert bei stehendem Postfach-Abruf (ALERT_EMAIL)
+  await queues().slaCheck.upsertJobScheduler("monitor", { every: 10 * 60_000 });
+
+  // Worker-Heartbeat für /api/health
+  const { recordHeartbeat } = await import("@/server/monitoring");
+  await recordHeartbeat("worker");
+  setInterval(() => void recordHeartbeat("worker").catch(() => {}), 30_000);
 
   const workers = [
     new Worker(
@@ -43,6 +50,8 @@ async function main() {
       "mail-poll",
       async () => {
         await pollAllMailboxes();
+        const { recordHeartbeat } = await import("@/server/monitoring");
+        await recordHeartbeat("mail-poll");
       },
       { connection, concurrency: 1 }
     ),
@@ -96,7 +105,12 @@ async function main() {
 
     new Worker(
       "sla-check",
-      async () => {
+      async (job) => {
+        if (job.name === "monitor") {
+          const { checkMailPollAndAlert } = await import("@/server/monitoring");
+          await checkMailPollAndAlert();
+          return;
+        }
         const escalated = await checkSlaBreaches();
         if (escalated > 0) console.log(`[sla] ${escalated} Verletzung(en) eskaliert`);
       },

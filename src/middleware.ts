@@ -17,6 +17,6 @@ export const config = {
   // Öffentliche Bereiche (Portal, Wissensdatenbank) und Routen mit eigener
   // Auth (API, Anhänge) sind ausgenommen
   matcher: [
-    "/((?!api|portal|kb|kb-assets|csat|attachments|_next/static|_next/image|favicon.ico).*)",
+    "/((?!api|portal|kb|kb-assets|csat|attachments|embed|_next/static|_next/image|favicon.ico).*)",
   ],
 };

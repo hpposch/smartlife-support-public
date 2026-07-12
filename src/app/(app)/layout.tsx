@@ -39,6 +39,13 @@ export default async function AppLayout({ children }: { children: React.ReactNod
             )}
           </nav>
           <div className="ml-auto flex items-center gap-3 text-sm">
+            <Link
+              href="/settings/security"
+              className="text-slate-400 hover:text-slate-600"
+              title="Sicherheit (2FA)"
+            >
+              🔒
+            </Link>
             <span className="text-slate-500">
               {user.name} · {ROLE_LABELS[user.role]}
             </span>

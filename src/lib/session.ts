@@ -4,6 +4,10 @@ import { env } from "./env";
 
 export interface SessionData {
   userId?: string;
+  // 2FA: Passwort war korrekt, TOTP-Code steht noch aus
+  pendingUserId?: string;
+  // 2FA-Einrichtung: Secret bis zur Bestätigung nur in der Session
+  pendingTotpSecret?: string;
 }
 
 // Als Funktion, nicht als Konstante: SESSION_SECRET darf erst zur Laufzeit

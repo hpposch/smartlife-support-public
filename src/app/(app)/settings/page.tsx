@@ -13,6 +13,7 @@ const SECTIONS = [
   { href: "/settings/automation", title: "Automatisierung", desc: "Erstellungs- und Zeitregeln, Auto-Zuweisung" },
   { href: "/settings/webhooks", title: "Webhooks", desc: "Ticket-Ereignisse an externe Systeme senden" },
   { href: "/settings/backups", title: "Backups", desc: "Automatische Sicherungen als eine Datei, Download & Wiederherstellung" },
+  { href: "/settings/security", title: "Sicherheit (2FA)", desc: "Zwei-Faktor-Authentifizierung für das eigene Konto" },
 ];
 
 export default async function SettingsPage() {

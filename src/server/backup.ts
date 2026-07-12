@@ -85,10 +85,50 @@ export async function createBackup(): Promise<BackupInfo> {
 
     await pruneBackups();
     const info = await stat(target);
+    await uploadBackupToS3(target, fileName).catch((error) => {
+      // Upload-Fehler nicht fatal — lokales Backup existiert; im Log sichtbar
+      console.error(`[backup] S3-Upload fehlgeschlagen: ${String(error).slice(0, 300)}`);
+    });
     return { fileName, sizeBytes: info.size, createdAt: info.mtime };
   } finally {
     await rm(tmp, { recursive: true, force: true });
   }
+}
+
+/**
+ * Optionaler Upload zu S3-kompatiblem Speicher (AWS S3, MinIO, Backblaze,
+ * Hetzner …). Aktiv, sobald S3_BACKUP_BUCKET + Zugangsdaten gesetzt sind:
+ *   S3_BACKUP_BUCKET, S3_ACCESS_KEY_ID, S3_SECRET_ACCESS_KEY,
+ *   S3_ENDPOINT (leer = AWS), S3_REGION (Standard eu-central-1), S3_PREFIX
+ */
+async function uploadBackupToS3(filePath: string, fileName: string): Promise<void> {
+  const bucket = process.env.S3_BACKUP_BUCKET;
+  if (!bucket || !process.env.S3_ACCESS_KEY_ID || !process.env.S3_SECRET_ACCESS_KEY) return;
+
+  const { S3Client, PutObjectCommand } = await import("@aws-sdk/client-s3");
+  const { createReadStream } = await import("node:fs");
+  const client = new S3Client({
+    region: process.env.S3_REGION ?? "eu-central-1",
+    ...(process.env.S3_ENDPOINT
+      ? { endpoint: process.env.S3_ENDPOINT, forcePathStyle: true }
+      : {}),
+    credentials: {
+      accessKeyId: process.env.S3_ACCESS_KEY_ID,
+      secretAccessKey: process.env.S3_SECRET_ACCESS_KEY,
+    },
+  });
+  const key = `${(process.env.S3_PREFIX ?? "smartlife-support").replace(/\/$/, "")}/${fileName}`;
+  const { size } = await stat(filePath);
+  await client.send(
+    new PutObjectCommand({
+      Bucket: bucket,
+      Key: key,
+      Body: createReadStream(filePath),
+      ContentLength: size,
+      ContentType: "application/gzip",
+    })
+  );
+  console.log(`[backup] Nach S3 hochgeladen: s3://${bucket}/${key}`);
 }
 
 /** Löscht Backups, die älter als BACKUP_KEEP_DAYS (Standard 30) sind — das jüngste bleibt immer. */

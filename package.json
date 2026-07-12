@@ -21,6 +21,7 @@
   },
   "dependencies": {
     "@anthropic-ai/sdk": "^0.111.0",
+    "@aws-sdk/client-s3": "^3.1085.0",
     "@node-rs/argon2": "^2.0.2",
     "@prisma/client": "^6.8.0",
     "bullmq": "^5.44.0",
@@ -33,6 +34,7 @@
     "next": "^15.3.0",
     "nodemailer": "^7.0.0",
     "openai": "^6.46.0",
+    "qrcode": "^1.5.4",
     "react": "^19.1.0",
     "react-dom": "^19.1.0",
     "sanitize-html": "^2.14.0",
@@ -43,6 +45,7 @@
     "@types/mailparser": "^3.4.5",
     "@types/node": "^22.14.0",
     "@types/nodemailer": "^7.0.0",
+    "@types/qrcode": "^1.5.6",
     "@types/react": "^19.1.0",
     "@types/react-dom": "^19.1.0",
     "@types/sanitize-html": "^2.13.0",

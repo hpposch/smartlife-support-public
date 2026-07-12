@@ -21,6 +21,13 @@ async function login(formData: FormData) {
   await rateLimitReset("login-email", email);
 
   const session = await getSession();
+  if (user.totpSecret) {
+    // 2FA aktiv: erst nach gültigem TOTP-Code einloggen
+    session.pendingUserId = user.id;
+    session.userId = undefined;
+    await session.save();
+    redirect("/login/2fa");
+  }
   session.userId = user.id;
   await session.save();
   redirect("/tickets");
