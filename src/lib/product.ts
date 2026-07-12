@@ -49,3 +49,19 @@ export function productAccent(product: Product): string {
 export function productLogoUrl(product: Product): string | null {
   return product.logoKey ? `/${product.logoKey}` : null;
 }
+
+/** Browser-Titel des Produkts (Tab-Name); leer = "<Name> Support". */
+export function productTitle(product: Product): string {
+  return product.portalTitle?.trim() || `${product.name} Support`;
+}
+
+/** Next-Metadata (Titel + Favicon) für kundenseitige Seiten eines Produkts. */
+export function productMetadata(product: Product): {
+  title: string;
+  icons?: { icon: string };
+} {
+  return {
+    title: productTitle(product),
+    ...(product.faviconKey ? { icons: { icon: `/${product.faviconKey}` } } : {}),
+  };
+}

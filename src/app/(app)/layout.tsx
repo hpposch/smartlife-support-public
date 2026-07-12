@@ -11,6 +11,13 @@ async function logout() {
   redirect("/login");
 }
 
+export async function generateMetadata() {
+  const { defaultProduct, productMetadata, productTitle } = await import("@/lib/product");
+  const product = await defaultProduct();
+  const meta = productMetadata(product);
+  return { ...meta, title: `${productTitle(product)} — Agenten` };
+}
+
 export default async function AppLayout({ children }: { children: React.ReactNode }) {
   const user = await requireUser();
   return (

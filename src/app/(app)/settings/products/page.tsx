@@ -36,6 +36,7 @@ async function saveProduct(formData: FormData) {
 
   const accentRaw = String(formData.get("accentColor") ?? "").trim().toLowerCase();
   const logoKey = await saveUploadedImage(formData.get("logo"), `logo-${key}`);
+  const faviconKey = await saveUploadedImage(formData.get("favicon"), `favicon-${key}`);
   const data = {
     key,
     name,
@@ -48,8 +49,11 @@ async function saveProduct(formData: FormData) {
     oidcClientId: String(formData.get("oidcClientId") ?? "").trim() || null,
     oidcSecretRef:
       String(formData.get("oidcSecretRef") ?? "").trim().match(/^[A-Z][A-Z0-9_]*$/)?.[0] ?? null,
+    portalTitle: String(formData.get("portalTitle") ?? "").trim().slice(0, 100) || null,
     ...(logoKey ? { logoKey } : {}),
     ...(formData.get("removeLogo") === "1" ? { logoKey: null } : {}),
+    ...(faviconKey ? { faviconKey } : {}),
+    ...(formData.get("removeFavicon") === "1" ? { faviconKey: null } : {}),
   };
   if (id) {
     await db.product.update({ where: { id }, data });
@@ -188,6 +192,35 @@ export default async function ProductsPage() {
                   )}
                 </span>
               </label>
+              <label className="block text-xs font-medium text-slate-500">
+                Browser-Titel (Tab-Name; leer = „{p.name} Support“)
+                <input
+                  name="portalTitle"
+                  defaultValue={p.portalTitle ?? ""}
+                  placeholder={`${p.name} Support`}
+                  className="input mt-1"
+                />
+              </label>
+              <label className="block text-xs font-medium text-slate-500">
+                Favicon (ICO/PNG/SVG, ideal 32×32)
+                <span className="mt-1 flex items-center gap-2">
+                  {p.faviconKey && (
+                    // eslint-disable-next-line @next/next/no-img-element
+                    <img src={`/${p.faviconKey}`} alt="" className="h-6 w-6 rounded border border-slate-100 bg-white p-0.5" />
+                  )}
+                  <input
+                    name="favicon"
+                    type="file"
+                    accept="image/x-icon,image/vnd.microsoft.icon,image/png,image/svg+xml"
+                    className="text-xs"
+                  />
+                  {p.faviconKey && (
+                    <label className="flex items-center gap-1 text-xs text-slate-500">
+                      <input type="checkbox" name="removeFavicon" value="1" /> entfernen
+                    </label>
+                  )}
+                </span>
+              </label>
             </div>
             <div className="mt-3 flex items-center gap-4 text-xs text-slate-500">
               <span>
@@ -253,6 +286,14 @@ export default async function ProductsPage() {
           <label className="block text-xs font-medium text-slate-500">
             Logo (optional)
             <input name="logo" type="file" accept="image/png,image/jpeg,image/svg+xml,image/webp" className="mt-1 block text-xs" />
+          </label>
+          <label className="block text-xs font-medium text-slate-500">
+            Favicon (optional)
+            <input name="favicon" type="file" accept="image/x-icon,image/vnd.microsoft.icon,image/png,image/svg+xml" className="mt-1 block text-xs" />
+          </label>
+          <label className="block text-xs font-medium text-slate-500">
+            Browser-Titel (optional)
+            <input name="portalTitle" placeholder="z. B. plantbeat Hilfe" className="input mt-1" />
           </label>
         </div>
         <button type="submit" className="btn-primary mt-3">

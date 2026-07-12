@@ -6,6 +6,8 @@ const IMAGE_EXT: Record<string, string> = {
   "image/jpeg": ".jpg",
   "image/svg+xml": ".svg",
   "image/webp": ".webp",
+  "image/x-icon": ".ico",
+  "image/vnd.microsoft.icon": ".ico",
 };
 
 /** Hochgeladenes Bild ablegen; liefert den Storage-Key oder null (kein/ungültiges Bild). */

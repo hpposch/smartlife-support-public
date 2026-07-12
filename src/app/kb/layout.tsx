@@ -1,8 +1,14 @@
 import Link from "next/link";
 import { getCurrentContact } from "@/lib/portal-session";
-import { currentProduct, productAccent, productLogoUrl } from "@/lib/product";
+import { currentProduct, productAccent, productLogoUrl, productMetadata, productTitle } from "@/lib/product";
 import { isAiEnabled } from "@/server/ai";
 import { ChatWidget } from "@/components/chat-widget";
+
+export async function generateMetadata() {
+  const product = await currentProduct();
+  const meta = productMetadata(product);
+  return { ...meta, title: `${productTitle(product)} — Hilfe-Center` };
+}
 
 export default async function KbLayout({ children }: { children: React.ReactNode }) {
   const contact = await getCurrentContact();

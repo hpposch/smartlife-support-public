@@ -176,9 +176,12 @@ model Product {
   domain      String? @unique // Portal-Domain, z. B. "support.smartlifebi.com"
   portalUrl   String? @map("portal_url") // Basis-URL für Links in Kunden-E-Mails
   isDefault   Boolean @default(false) @map("is_default")
-  // Portal-Branding: Akzent-/Hero-Farbe (Hex) und hochgeladenes Logo
+  // Portal-Branding: Akzent-/Hero-Farbe (Hex), Logo, Favicon und Browser-Titel
   accentColor String? @map("accent_color")
   logoKey     String? @map("logo_key")
+  faviconKey  String? @map("favicon_key")
+  // Browser-Titel (Tab-Name) für Portal/Hilfe-Center; leer = "<Name> Support"
+  portalTitle String? @map("portal_title")
   // Eigener OIDC-Login-Provider (optional; sonst gilt das globale Azure B2C).
   // Secret als ENV-Referenz — kein Klartext in der DB.
   oidcAuthority String? @map("oidc_authority")

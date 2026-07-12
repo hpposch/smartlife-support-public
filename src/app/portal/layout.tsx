@@ -2,7 +2,7 @@ import Link from "next/link";
 import { redirect } from "next/navigation";
 import { logoutUrl, oidcConfigForProduct } from "@/lib/b2c";
 import { getCurrentContact, getPortalSession } from "@/lib/portal-session";
-import { currentProduct, productAccent, productLogoUrl } from "@/lib/product";
+import { currentProduct, productAccent, productLogoUrl, productMetadata } from "@/lib/product";
 import { isAiEnabled } from "@/server/ai";
 import { ChatWidget } from "@/components/chat-widget";
 
@@ -18,6 +18,10 @@ async function portalLogout() {
     if (url) redirect(url);
   }
   redirect("/portal/login");
+}
+
+export async function generateMetadata() {
+  return productMetadata(await currentProduct());
 }
 
 export default async function PortalLayout({ children }: { children: React.ReactNode }) {
