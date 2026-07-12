@@ -30,3 +30,20 @@ export async function storeFile(prefix: "attachments" | "raw-eml", data: Buffer)
 export async function readStoredFile(key: string): Promise<Buffer> {
   return readFile(resolveKey(key));
 }
+
+/**
+ * Branding-Uploads (Logos, Kategorie-Icons) unter kb-assets/branding ablegen —
+ * dort werden sie von der bestehenden /kb-assets-Route ausgeliefert. Der
+ * Zufallsanteil im Namen umgeht den immutable-Browser-Cache beim Austausch.
+ */
+export async function storeBrandingFile(baseName: string, ext: string, data: Buffer): Promise<string> {
+  const key = path.posix.join(
+    "kb-assets",
+    "branding",
+    `${baseName}-${randomUUID().slice(0, 8)}${ext}`
+  );
+  const full = resolveKey(key);
+  await mkdir(path.dirname(full), { recursive: true });
+  await writeFile(full, data);
+  return key;
+}

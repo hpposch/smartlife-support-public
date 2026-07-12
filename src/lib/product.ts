@@ -36,3 +36,16 @@ export const currentProduct = cache(async (): Promise<Product> => {
 export function productPortalUrl(product: Product): string {
   return (product.portalUrl ?? env.appUrl).replace(/\/$/, "");
 }
+
+/** Akzent-/Hero-Farbe des Produkts (Fallback: bisheriges Blau). */
+export const DEFAULT_ACCENT = "#2563eb";
+
+export function productAccent(product: Product): string {
+  const color = product.accentColor?.trim() ?? "";
+  return /^#[0-9a-fA-F]{6}$/.test(color) ? color : DEFAULT_ACCENT;
+}
+
+/** URL des hochgeladenen Produkt-Logos (oder null). */
+export function productLogoUrl(product: Product): string | null {
+  return product.logoKey ? `/${product.logoKey}` : null;
+}

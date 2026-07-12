@@ -2,6 +2,7 @@ import Link from "next/link";
 import { revalidatePath } from "next/cache";
 import type { Prisma } from "@prisma/client";
 import { requireAdmin } from "@/lib/auth";
+import { saveUploadedImage } from "@/lib/branding";
 import { db } from "@/lib/db";
 import { formatDateTime } from "@/lib/labels";
 import { slugify } from "@/lib/markdown";
@@ -29,6 +30,21 @@ async function toggleCategoryHidden(formData: FormData) {
   const id = String(formData.get("id"));
   const category = await db.kbCategory.findUniqueOrThrow({ where: { id } });
   await db.kbCategory.update({ where: { id }, data: { isHidden: !category.isHidden } });
+  revalidatePath("/settings/kb");
+  revalidatePath("/kb");
+}
+
+/** Kategorie-Icon hochladen bzw. entfernen (Karte im Hilfe-Center). */
+async function setCategoryIcon(formData: FormData) {
+  "use server";
+  await requireAdmin();
+  const id = String(formData.get("id"));
+  if (formData.get("removeIcon") === "1") {
+    await db.kbCategory.update({ where: { id }, data: { iconKey: null } });
+  } else {
+    const iconKey = await saveUploadedImage(formData.get("icon"), `cat-${id.slice(0, 8)}`);
+    if (iconKey) await db.kbCategory.update({ where: { id }, data: { iconKey } });
+  }
   revalidatePath("/settings/kb");
   revalidatePath("/kb");
 }
@@ -109,6 +125,10 @@ export default async function KbAdminPage({
                   : "border-slate-200 bg-white text-slate-700"
               }`}
             >
+              {category.iconKey && (
+                // eslint-disable-next-line @next/next/no-img-element
+                <img src={`/${category.iconKey}`} alt="" className="h-4 w-4 object-contain" />
+              )}
               <span className={category.isHidden ? "line-through" : ""}>
                 {category.name} ({category._count.articles})
                 {products.length > 1 && (
@@ -120,6 +140,32 @@ export default async function KbAdminPage({
                 <button type="submit" className="text-blue-700 hover:underline">
                   {category.isHidden ? "Einblenden" : "Ausblenden"}
                 </button>
+              </form>
+              <form action={setCategoryIcon} className="flex items-center gap-1">
+                <input type="hidden" name="id" value={category.id} />
+                <label className="cursor-pointer text-blue-700 hover:underline">
+                  Icon
+                  <input
+                    type="file"
+                    name="icon"
+                    accept="image/png,image/jpeg,image/svg+xml,image/webp"
+                    className="hidden"
+                  />
+                </label>
+                <button type="submit" className="text-slate-400 hover:text-blue-700" title="Icon speichern">
+                  ↑
+                </button>
+                {category.iconKey && (
+                  <button
+                    type="submit"
+                    name="removeIcon"
+                    value="1"
+                    className="text-slate-400 hover:text-red-600"
+                    title="Icon entfernen"
+                  >
+                    ×
+                  </button>
+                )}
               </form>
             </li>
           ))}

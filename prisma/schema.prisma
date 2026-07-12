@@ -164,12 +164,15 @@ model PortalLoginToken {
 // Produkt/Mandant: Tickets, Wissensdatenbank und Postfächer sind einem Produkt
 // zugeordnet; das Portal wählt das Produkt anhand der aufgerufenen Domain
 model Product {
-  id        String  @id @default(uuid())
-  key       String  @unique // kurzer Bezeichner, z. B. "smartlifebi"
-  name      String // Anzeigename im Portal, z. B. "smartlife BI"
-  domain    String? @unique // Portal-Domain, z. B. "support.smartlifebi.com"
-  portalUrl String? @map("portal_url") // Basis-URL für Links in Kunden-E-Mails
-  isDefault Boolean @default(false) @map("is_default")
+  id          String  @id @default(uuid())
+  key         String  @unique // kurzer Bezeichner, z. B. "smartlifebi"
+  name        String // Anzeigename im Portal, z. B. "smartlife BI"
+  domain      String? @unique // Portal-Domain, z. B. "support.smartlifebi.com"
+  portalUrl   String? @map("portal_url") // Basis-URL für Links in Kunden-E-Mails
+  isDefault   Boolean @default(false) @map("is_default")
+  // Portal-Branding: Akzent-/Hero-Farbe (Hex) und hochgeladenes Logo
+  accentColor String? @map("accent_color")
+  logoKey     String? @map("logo_key")
 
   tickets      Ticket[]
   mailboxes    Mailbox[]
@@ -360,6 +363,8 @@ model KbCategory {
   sortOrder Int     @default(0) @map("sort_order")
   // Ausgeblendete Kategorien (inkl. aller Artikel) erscheinen nicht im Hilfe-Center
   isHidden  Boolean @default(false) @map("is_hidden")
+  // Optionales Icon (hochgeladenes Bild) für die Kategorie-Karte im Hilfe-Center
+  iconKey   String? @map("icon_key")
   productId String  @map("product_id")
 
   product  Product     @relation(fields: [productId], references: [id])

@@ -4,7 +4,9 @@
 import { revalidatePath } from "next/cache";
 import { Prisma } from "@prisma/client";
 import { requireAdmin } from "@/lib/auth";
+import { saveUploadedImage } from "@/lib/branding";
 import { db } from "@/lib/db";
+import { DEFAULT_ACCENT } from "@/lib/product";
 
 function normalizedDomain(value: FormDataEntryValue | null): string | null {
   const domain = String(value ?? "")
@@ -31,11 +33,17 @@ async function saveProduct(formData: FormData) {
   const name = String(formData.get("name") ?? "").trim();
   if (!key || !name) return;
 
+  const accentRaw = String(formData.get("accentColor") ?? "").trim().toLowerCase();
+  const logoKey = await saveUploadedImage(formData.get("logo"), `logo-${key}`);
   const data = {
     key,
     name,
     domain: normalizedDomain(formData.get("domain")),
     portalUrl: normalizedUrl(formData.get("portalUrl")),
+    // Standardfarbe nicht speichern — so greifen spätere Default-Anpassungen
+    accentColor: /^#[0-9a-f]{6}$/.test(accentRaw) && accentRaw !== DEFAULT_ACCENT ? accentRaw : null,
+    ...(logoKey ? { logoKey } : {}),
+    ...(formData.get("removeLogo") === "1" ? { logoKey: null } : {}),
   };
   if (id) {
     await db.product.update({ where: { id }, data });
@@ -43,6 +51,7 @@ async function saveProduct(formData: FormData) {
     await db.product.create({ data });
   }
   revalidatePath("/settings/products");
+  revalidatePath("/kb");
 }
 
 async function makeDefault(formData: FormData) {
@@ -123,6 +132,30 @@ export default async function ProductsPage() {
                   className="input mt-1"
                 />
               </label>
+              <label className="block text-xs font-medium text-slate-500">
+                Portalfarbe (Hero-Hintergrund, Buttons)
+                <input
+                  name="accentColor"
+                  type="color"
+                  defaultValue={p.accentColor ?? DEFAULT_ACCENT}
+                  className="mt-1 h-9 w-16 cursor-pointer rounded border border-slate-200"
+                />
+              </label>
+              <label className="block text-xs font-medium text-slate-500">
+                Logo (PNG/JPG/SVG/WebP, max. 2 MB)
+                <span className="mt-1 flex items-center gap-2">
+                  {p.logoKey && (
+                    // eslint-disable-next-line @next/next/no-img-element
+                    <img src={`/${p.logoKey}`} alt="" className="h-8 w-auto rounded border border-slate-100 bg-white p-0.5" />
+                  )}
+                  <input name="logo" type="file" accept="image/png,image/jpeg,image/svg+xml,image/webp" className="text-xs" />
+                  {p.logoKey && (
+                    <label className="flex items-center gap-1 text-xs text-slate-500">
+                      <input type="checkbox" name="removeLogo" value="1" /> entfernen
+                    </label>
+                  )}
+                </span>
+              </label>
             </div>
             <div className="mt-3 flex items-center gap-4 text-xs text-slate-500">
               <span>
@@ -172,6 +205,19 @@ export default async function ProductsPage() {
           <label className="block text-xs font-medium text-slate-500">
             Portal-URL
             <input name="portalUrl" placeholder="https://support.plantbeat.io" className="input mt-1" />
+          </label>
+          <label className="block text-xs font-medium text-slate-500">
+            Portalfarbe
+            <input
+              name="accentColor"
+              type="color"
+              defaultValue={DEFAULT_ACCENT}
+              className="mt-1 h-9 w-16 cursor-pointer rounded border border-slate-200"
+            />
+          </label>
+          <label className="block text-xs font-medium text-slate-500">
+            Logo (optional)
+            <input name="logo" type="file" accept="image/png,image/jpeg,image/svg+xml,image/webp" className="mt-1 block text-xs" />
           </label>
         </div>
         <button type="submit" className="btn-primary mt-3">

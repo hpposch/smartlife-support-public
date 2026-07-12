@@ -4,7 +4,7 @@ import { db } from "@/lib/db";
 import { formatDateTime } from "@/lib/labels";
 import { renderMarkdown } from "@/lib/markdown";
 import { getCurrentContact } from "@/lib/portal-session";
-import { currentProduct } from "@/lib/product";
+import { currentProduct, productAccent } from "@/lib/product";
 
 export default async function KbArticlePage({
   params,
@@ -14,6 +14,7 @@ export default async function KbArticlePage({
   const { slug } = await params;
   const contact = await getCurrentContact();
   const product = await currentProduct();
+  const accent = productAccent(product);
 
   const article = await db.kbArticle.findUnique({
     where: { productId_slug: { productId: product.id, slug } },
@@ -25,7 +26,7 @@ export default async function KbArticlePage({
   if (article.visibility === "customers" && !contact) notFound();
 
   return (
-    <article className="mx-auto max-w-2xl">
+    <article className="mx-auto max-w-2xl px-4 py-8">
       <p className="mb-2 text-xs text-slate-400">
         <Link href="/kb" className="hover:underline">
           Hilfe-Center
@@ -42,7 +43,11 @@ export default async function KbArticlePage({
       />
       <div className="mt-10 rounded-lg border border-slate-200 bg-white p-4 text-center text-sm shadow-sm">
         <p className="text-slate-600">Hat dieser Artikel nicht geholfen?</p>
-        <Link href={contact ? "/portal/new" : "/portal/login"} className="btn-primary mt-2">
+        <Link
+          href={contact ? "/portal/new" : "/portal/login"}
+          className="btn-primary mt-2"
+          style={{ backgroundColor: accent }}
+        >
           Anfrage an den Support stellen
         </Link>
       </div>

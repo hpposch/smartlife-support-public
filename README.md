@@ -124,6 +124,8 @@ Einrichtung:
 
 Produktbezogen sind außerdem: Absendername („\<Produkt\> Support") und Signatur in Kunden-Mails, Magic-Link-/CSAT-Links (Portal-URL des Produkts), Chat-Assistent (antwortet nur aus der KB des jeweiligen Produkts, Tickets landen im richtigen Produkt) und `POST /api/v1/tickets` (optionales Feld `product` mit dem Kürzel). Hinweis: Der Azure-B2C-Login ist auf die Redirect-URI der Haupt-Domain registriert — auf weiteren Produkt-Domains steht der Magic-Link-Login zur Verfügung (`PORTAL_MAGIC_LINK=true`, Standard ohne B2C).
 
+**Portal-Branding (einstellbar pro Produkt):** Das Hilfe-Center hat einen farbigen Hero-Bereich mit zentrierter Suche und Kategorie-Karten mit Icons — im Stil gängiger Support-Portale. Unter *Verwaltung → Produkte* lassen sich **Portalfarbe** (Hero-Hintergrund, Buttons, Akzente) und **Logo** (erscheint im Kopfbereich von Hilfe-Center und Portal) je Produkt festlegen; unter *Verwaltung → Wissensdatenbank* bekommt jede Kategorie optional ein eigenes **Icon** (PNG/JPG/SVG/WebP, ohne Icon: neutrales Ordner-Symbol in der Portalfarbe). Ohne Einstellungen gilt das bisherige Blau.
+
 ### Wissensdatenbank: Bold-BI-Doku importieren (Rebranding auf smartlife BI)
 
 Importiert alle ~890 Artikel aus [boldbi/bold-bi-docs](https://github.com/boldbi/bold-bi-docs) in das Hilfe-Center — inkl. Bilder, Kategorien und umgeschriebener interner Links. Dabei wird durchgängig **„Bold BI" → „smartlife BI"** und **„Syncfusion" → „smartlife"** ersetzt (anpassbar über die Konstanten am Skriptanfang).
