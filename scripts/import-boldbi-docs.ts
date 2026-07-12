@@ -306,6 +306,19 @@ async function main() {
     `Fertig: ${created} neu, ${updated} aktualisiert, ${categoryIds.size} Kategorien, ` +
       `${copied} Bilder kopiert${missing ? `, ${missing} Bildverweise ohne Datei` : ""}`
   );
+
+  // Semantischer Index (nur mit OpenAI-kompatiblem Provider aktiv)
+  if (!dryRun) {
+    const { embedPendingArticles } = await import("../src/server/kb-search");
+    let total = 0;
+    for (;;) {
+      const batch = await embedPendingArticles(100);
+      if (batch === 0) break;
+      total += batch;
+      console.log(`  … ${total} Artikel-Embeddings`);
+    }
+    if (total > 0) console.log(`${total} Artikel für die semantische Suche indexiert`);
+  }
 }
 
 // Nur ausführen, wenn direkt aufgerufen (Funktionen sind für Tests exportiert)

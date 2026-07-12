@@ -4,8 +4,8 @@
 import * as z from "zod/v4";
 import { db } from "@/lib/db";
 import { renderMarkdown } from "@/lib/markdown";
-import { extractKeywords } from "./ai";
 import { aiCompleteStructured } from "./ai-provider";
+import { searchKb } from "./kb-search";
 
 export interface ChatMessage {
   role: "user" | "assistant";
@@ -56,27 +56,18 @@ export async function assistantReply(
 ): Promise<AssistantResult> {
   const chat = clampChat(history);
 
-  // Passende KB-Artikel (des Produkts) zu den letzten Nutzer-Nachrichten suchen
+  // Passende KB-Artikel (des Produkts) zu den letzten Nutzer-Nachrichten suchen —
+  // Volltext + optional semantisch (kb-search.ts)
   const userText = chat
     .filter((m) => m.role === "user")
     .slice(-2)
     .map((m) => m.text)
     .join(" ");
-  const keywords = extractKeywords(userText, 6);
+  const hits = await searchKb({ productId, query: userText, limit: 4 });
   const articles =
-    keywords.length > 0
+    hits.length > 0
       ? await db.kbArticle.findMany({
-          where: {
-            status: "published",
-            visibility: "public",
-            productId,
-            AND: [{ OR: [{ categoryId: null }, { category: { isHidden: false } }] }],
-            OR: keywords.flatMap((kw) => [
-              { title: { contains: kw, mode: "insensitive" as const } },
-              { bodyMarkdown: { contains: kw, mode: "insensitive" as const } },
-            ]),
-          },
-          take: 4,
+          where: { id: { in: hits.map((h) => h.id) } },
           select: { title: true, slug: true, bodyMarkdown: true },
         })
       : [];

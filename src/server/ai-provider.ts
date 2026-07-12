@@ -106,6 +106,33 @@ function textOfAnthropic(response: Anthropic.Message): string {
 }
 
 // ---------------------------------------------------------------------------
+// Embeddings (nur OpenAI-kompatibler Provider — die Claude API bietet keine)
+// ---------------------------------------------------------------------------
+
+export function isEmbeddingsEnabled(): boolean {
+  return (
+    isAiEnabled() && aiProvider() === "openai" && process.env.AI_EMBEDDINGS !== "false"
+  );
+}
+
+/** Texte in normalisierte Embedding-Vektoren umwandeln; null wenn nicht verfügbar. */
+export async function aiEmbed(texts: string[]): Promise<number[][] | null> {
+  if (!isEmbeddingsEnabled() || texts.length === 0) return null;
+  const response = await openai().embeddings.create({
+    model: process.env.AI_EMBEDDING_MODEL ?? "text-embedding-3-small",
+    input: texts,
+  });
+  return response.data
+    .sort((a, b) => a.index - b.index)
+    .map((item) => normalize(item.embedding));
+}
+
+function normalize(vector: number[]): number[] {
+  const length = Math.sqrt(vector.reduce((sum, v) => sum + v * v, 0)) || 1;
+  return vector.map((v) => v / length);
+}
+
+// ---------------------------------------------------------------------------
 // Freitext-Vervollständigung
 // ---------------------------------------------------------------------------
 

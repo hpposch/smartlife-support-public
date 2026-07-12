@@ -169,6 +169,44 @@ async function main() {
     assert.ok(chatQuestion.replyHtml.includes("/kb/"), "OpenAI: Antwort verlinkt KB-Artikel");
     console.log("✓ OpenAI-Provider: Chat-Assistent (Antwort + Ticket-Angebot)");
 
+    // 4b) KB-Artikel-Entwurf aus Ticket
+    const { draftKbArticleFromTicket } = await import("../src/server/ai");
+    const kbDraftId = await draftKbArticleFromTicket(ticket.id, admin.id);
+    const kbDraft = await db.kbArticle.findUniqueOrThrow({ where: { id: kbDraftId } });
+    assert.equal(kbDraft.status, "draft", "KB-Entwurf ist Entwurf");
+    assert.ok(kbDraft.bodyMarkdown.includes("[Stub]"), "KB-Entwurf kommt aus der API");
+    assert.equal(kbDraft.productId, product.id, "KB-Entwurf im Produkt des Tickets");
+    console.log("✓ KB-Artikel-Entwurf aus Ticket");
+
+    // 5) Semantische Suche: Artikel einbetten, dann mit anderen Worten finden
+    const { embedPendingArticles, searchKb } = await import("../src/server/kb-search");
+    const kbCat = await db.kbCategory.upsert({
+      where: { productId_slug: { productId: product.id, slug: `smoke-${suffix}` } },
+      update: {},
+      create: { name: `Smoke ${suffix}`, slug: `smoke-${suffix}`, productId: product.id },
+    });
+    await db.kbArticle.create({
+      data: {
+        title: `Exportieren von Berichten als PDF ${suffix}`,
+        slug: `export-pdf-${suffix}`,
+        bodyMarkdown: "Berichte lassen sich über das Menü Exportieren als PDF Datei speichern.",
+        productId: product.id,
+        categoryId: kbCat.id,
+        status: "published",
+        visibility: "public",
+        publishedAt: new Date(),
+      },
+    });
+    const embedded = await embedPendingArticles(200);
+    assert.ok(embedded > 0, "Embeddings erzeugt");
+    const hits = await searchKb({
+      productId: product.id,
+      query: `Exportieren PDF ${suffix}`,
+      limit: 5,
+    });
+    assert.ok(hits.some((h) => h.slug === `export-pdf-${suffix}`), "Suche findet den Artikel");
+    console.log(`✓ Volltext-/semantische Suche (${embedded} Artikel indexiert)`);
+
     console.log("\nAlle KI-Rauchtests bestanden (Anthropic- und OpenAI-Provider).");
   } finally {
     stopStub(stub);
@@ -176,7 +214,7 @@ async function main() {
     const { queues } = await import("../src/lib/queue");
     const q = queues();
     await Promise.allSettled(
-      [q.mailPoll, q.emailIngest, q.emailSend, q.notify, q.backup, q.slaCheck, q.timeRules, q.webhook, q.aiClassify].map((x) => x.close())
+      [q.mailPoll, q.emailIngest, q.emailSend, q.notify, q.backup, q.slaCheck, q.timeRules, q.webhook, q.aiClassify, q.kbIndex].map((x) => x.close())
     );
     q.connection.disconnect();
   }

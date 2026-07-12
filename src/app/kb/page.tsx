@@ -3,6 +3,7 @@ import type { Prisma } from "@prisma/client";
 import { db } from "@/lib/db";
 import { getCurrentContact } from "@/lib/portal-session";
 import { currentProduct, productAccent } from "@/lib/product";
+import { searchKb } from "@/server/kb-search";
 
 /** Standard-Icon für Kategorien ohne hochgeladenes Icon (in Akzentfarbe). */
 function DefaultCategoryIcon({ color }: { color: string }) {
@@ -50,31 +51,30 @@ export default async function KbHomePage({
     ? categories.find((c) => c.slug === kategorie)
     : null;
 
-  // Artikel-Liste nur bei Suche oder gewählter Kategorie
-  const where: Prisma.KbArticleWhereInput | null = q?.trim()
-    ? {
-        AND: [
-          base,
-          {
-            OR: [
-              { title: { contains: q.trim(), mode: "insensitive" } },
-              { bodyMarkdown: { contains: q.trim(), mode: "insensitive" } },
-            ],
-          },
-        ],
-      }
-    : activeCategory
-      ? { AND: [base, { categoryId: activeCategory.id }] }
-      : null;
-
-  const articles = where
-    ? await db.kbArticle.findMany({
-        where,
-        include: { category: true },
-        orderBy: { title: "asc" },
-        take: 500,
-      })
-    : [];
+  // Artikel-Liste bei Suche (Volltext + optional semantisch) oder Kategorie
+  let articles: { id: string; title: string; slug: string; categoryName: string | null }[] = [];
+  const showList = !!q?.trim() || !!activeCategory;
+  if (q?.trim()) {
+    articles = await searchKb({
+      productId: product.id,
+      query: q,
+      includeCustomers: !!contact,
+      limit: 100,
+    });
+  } else if (activeCategory) {
+    const rows = await db.kbArticle.findMany({
+      where: { AND: [base, { categoryId: activeCategory.id }] },
+      include: { category: true },
+      orderBy: { title: "asc" },
+      take: 500,
+    });
+    articles = rows.map((a) => ({
+      id: a.id,
+      title: a.title,
+      slug: a.slug,
+      categoryName: a.category?.name ?? null,
+    }));
+  }
 
   // Suchen protokollieren — "Suchen ohne Treffer" zeigen Doku-Lücken (Reporting)
   if (q?.trim()) {
@@ -115,7 +115,7 @@ export default async function KbHomePage({
       </div>
 
       <div className="mx-auto max-w-5xl px-4 py-10">
-        {where ? (
+        {showList ? (
           <div>
             <p className="mb-4 text-sm text-slate-500">
               <Link href="/kb" className="hover:underline" style={{ color: accent }}>
@@ -135,8 +135,8 @@ export default async function KbHomePage({
                     className="block rounded-lg border border-slate-200 bg-white px-4 py-3 shadow-sm hover:border-slate-300 hover:shadow"
                   >
                     <span className="text-sm font-medium">{article.title}</span>
-                    {q && article.category && (
-                      <span className="mt-0.5 block text-xs text-slate-400">{article.category.name}</span>
+                    {q && article.categoryName && (
+                      <span className="mt-0.5 block text-xs text-slate-400">{article.categoryName}</span>
                     )}
                   </Link>
                 </li>

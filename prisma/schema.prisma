@@ -387,6 +387,11 @@ model KbArticle {
   createdAt    DateTime     @default(now()) @map("created_at")
   updatedAt    DateTime     @default(now()) @updatedAt @map("updated_at")
   productId    String       @map("product_id")
+  // Volltextsuche: generierte tsvector-Spalte (deutsch + englisch, s. Migration)
+  searchTsv    Unsupported("tsvector")? @map("search_tsv")
+  // Optionale semantische Suche: Embedding-Vektor (Float32, normalisiert)
+  embedding    Bytes?       @map("embedding")
+  embeddedAt   DateTime?    @map("embedded_at")
 
   product  Product      @relation(fields: [productId], references: [id])
   category KbCategory?  @relation(fields: [categoryId], references: [id], onDelete: SetNull)

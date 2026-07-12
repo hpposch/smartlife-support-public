@@ -25,8 +25,20 @@ async function main() {
   }
   await queues().slaCheck.upsertJobScheduler("sla-check", { every: 5 * 60_000 });
   await queues().timeRules.upsertJobScheduler("time-rules", { every: 15 * 60_000 });
+  // Embeddings für neue/geänderte KB-Artikel (wirkt nur mit OpenAI-kompatiblem Provider)
+  await queues().kbIndex.upsertJobScheduler("kb-index", { every: 10 * 60_000 });
 
   const workers = [
+    new Worker(
+      "kb-index",
+      async () => {
+        const { embedPendingArticles } = await import("@/server/kb-search");
+        const count = await embedPendingArticles();
+        if (count > 0) console.log(`[kb-index] ${count} Artikel-Embedding(s) aktualisiert`);
+      },
+      { connection, concurrency: 1 }
+    ),
+
     new Worker(
       "mail-poll",
       async () => {

@@ -27,6 +27,12 @@ function decideText(system: string, lastUserText: string, structured: boolean): 
           }
     );
   }
+  if (system.includes("destillierst")) {
+    return JSON.stringify({
+      title: "Rechnungskorrektur anfordern",
+      body_markdown: "## Problem\n\nEine Rechnung ist fehlerhaft.\n\n## Lösung\n\n1. Support kontaktieren\n2. Korrektur abwarten\n\n[Stub]",
+    });
+  }
   if (structured) {
     return JSON.stringify({ category: "Abrechnung", priority: "high", sentiment: "verärgert" });
   }
@@ -67,6 +73,32 @@ createServer(async (req, res) => {
         stop_reason: "end_turn",
         stop_sequence: null,
         usage: { input_tokens: 100, output_tokens: 50 },
+      })
+    );
+    return;
+  }
+
+  if (req.url?.startsWith("/v1/embeddings")) {
+    // Deterministische Bag-of-Words-Vektoren (32 Dimensionen): Texte mit
+    // gemeinsamen Wörtern bekommen ähnliche Vektoren — genug, um die
+    // semantische Such-Pipeline realistisch zu testen.
+    const inputs: string[] = Array.isArray(request.input) ? request.input : [request.input];
+    const data = inputs.map((text, index) => {
+      const vector = new Array(32).fill(0);
+      for (const word of String(text).toLowerCase().split(/\W+/)) {
+        if (word.length < 3) continue;
+        let hash = 0;
+        for (const ch of word) hash = (hash * 31 + ch.charCodeAt(0)) % 32;
+        vector[hash] += 1;
+      }
+      return { object: "embedding", index, embedding: vector };
+    });
+    res.end(
+      JSON.stringify({
+        object: "list",
+        data,
+        model: request.model,
+        usage: { prompt_tokens: 10, total_tokens: 10 },
       })
     );
     return;

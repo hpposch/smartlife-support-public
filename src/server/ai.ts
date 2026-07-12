@@ -87,22 +87,12 @@ async function buildTicketContext(ticketId: string) {
   return { ticket, transcript };
 }
 
-/** Passende veröffentlichte KB-Artikel (des Produkts) per Stichwortsuche auf dem Betreff. */
+/** Passende veröffentlichte KB-Artikel (des Produkts) zum Betreff (kb-search.ts). */
 async function findRelevantKbArticles(subject: string, productId: string, limit = 3) {
-  const keywords = extractKeywords(subject);
-  if (keywords.length === 0) return [];
-  return db.kbArticle.findMany({
-    where: {
-      status: "published",
-      productId,
-      AND: [{ OR: [{ categoryId: null }, { category: { isHidden: false } }] }],
-      OR: keywords.flatMap((kw) => [
-        { title: { contains: kw, mode: "insensitive" as const } },
-        { bodyMarkdown: { contains: kw, mode: "insensitive" as const } },
-      ]),
-    },
-    take: limit,
-  });
+  const { searchKb } = await import("./kb-search");
+  const hits = await searchKb({ productId, query: subject, includeCustomers: true, limit });
+  if (hits.length === 0) return [];
+  return db.kbArticle.findMany({ where: { id: { in: hits.map((h) => h.id) } } });
 }
 
 // ---------------------------------------------------------------------------
@@ -185,6 +175,72 @@ Offene Punkte: <was als Nächstes zu tun ist / worauf gewartet wird>`,
       bodyText: `🤖 KI-Zusammenfassung:\n\n${summary}`,
     },
   });
+}
+
+// ---------------------------------------------------------------------------
+// 2b) KB-Artikel-Entwurf aus gelöstem Ticket
+// ---------------------------------------------------------------------------
+
+const kbDraftSchema = z.object({
+  title: z.string().describe("Prägnanter Artikel-Titel (Problem/Aufgabe, nicht der Ticket-Betreff)"),
+  body_markdown: z
+    .string()
+    .describe("Artikel in Markdown: kurze Problembeschreibung, dann Lösungsschritte"),
+});
+
+/** Erzeugt aus dem Ticketverlauf einen anonymisierten KB-Artikel-Entwurf. */
+export async function draftKbArticleFromTicket(
+  ticketId: string,
+  userId: string
+): Promise<string> {
+  const { ticket, transcript } = await buildTicketContext(ticketId);
+
+  const result = await aiCompleteStructured({
+    maxTokens: 4096,
+    schema: kbDraftSchema,
+    schemaName: "kb_article_draft",
+    system: `Du destillierst gelöste Support-Tickets zu Wissensdatenbank-Artikeln.
+
+Regeln:
+- Schreibe allgemeingültig (Anleitung), nicht als Antwort an einen einzelnen Kunden
+- KEINE personenbezogenen Daten: keine Namen, E-Mail-Adressen, Firmennamen,
+  Kundennummern, URLs von Kundenumgebungen — neutral formulieren
+- Sprache des Artikels = Sprache des Ticketverlaufs
+- Struktur: kurze Problem-/Aufgabenbeschreibung, dann nummerierte Lösungsschritte,
+  ggf. Hinweise/Voraussetzungen
+- Nur dokumentieren, was im Verlauf tatsächlich zur Lösung geführt hat`,
+    messages: [
+      {
+        role: "user",
+        content: `Ticket #${ticket.number} — Betreff: ${ticket.subject}\n\n${transcript}\n\nErstelle daraus jetzt den Wissensdatenbank-Artikel.`,
+      },
+    ],
+  });
+  if (!result) throw new Error("KI-Artikelentwurf nicht parsebar");
+
+  const { slugify } = await import("@/lib/markdown");
+  const base = slugify(result.title).slice(0, 80) || "artikel";
+  let slug = base;
+  for (let i = 2; ; i++) {
+    const clash = await db.kbArticle.findUnique({
+      where: { productId_slug: { productId: ticket.productId, slug } },
+    });
+    if (!clash) break;
+    slug = `${base}-${i}`;
+  }
+
+  const article = await db.kbArticle.create({
+    data: {
+      title: result.title.slice(0, 300),
+      slug,
+      bodyMarkdown: `${result.body_markdown}\n\n<!-- Entwurf aus Ticket #${ticket.number} -->`,
+      productId: ticket.productId,
+      status: "draft",
+      visibility: "public",
+      authorId: userId,
+    },
+  });
+  return article.id;
 }
 
 // ---------------------------------------------------------------------------

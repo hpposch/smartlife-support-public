@@ -85,6 +85,23 @@ export async function generateAiSummary(formData: FormData) {
   revalidatePath(`/tickets/${ticketId}`);
 }
 
+/** KI-KB-Artikel-Entwurf aus dem Ticket erzeugen → öffnet den Artikel-Editor. */
+export async function generateKbDraft(formData: FormData) {
+  const user = await requireUser();
+  const ticketId = z.string().uuid().parse(formData.get("ticketId"));
+  const { isAiEnabled, draftKbArticleFromTicket } = await import("@/server/ai");
+  if (!isAiEnabled()) return;
+  let articleId: string;
+  try {
+    articleId = await draftKbArticleFromTicket(ticketId, user.id);
+  } catch (error) {
+    console.error("[ai] KB-Entwurf fehlgeschlagen:", error);
+    return;
+  }
+  const { redirect } = await import("next/navigation");
+  redirect(`/settings/kb/${articleId}`);
+}
+
 const updateSchema = z.object({
   ticketId: z.string().uuid(),
   status: z.enum(["new", "open", "pending_customer", "pending_internal", "resolved", "closed"]),

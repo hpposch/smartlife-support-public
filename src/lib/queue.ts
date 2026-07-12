@@ -51,6 +51,10 @@ function createQueues() {
       connection,
       defaultJobOptions: { attempts: 2, backoff: { type: "exponential", delay: 15000 } },
     }),
+    kbIndex: new Queue("kb-index", {
+      connection,
+      defaultJobOptions: { attempts: 1 },
+    }),
   };
 }
 
