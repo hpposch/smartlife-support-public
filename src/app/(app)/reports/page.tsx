@@ -1,5 +1,5 @@
 import { requireLead } from "@/lib/auth";
-import { byAgent, byCategory, overviewStats, ticketsPerDay } from "@/server/reporting";
+import { byAgent, byCategory, kbStats, overviewStats, ticketsPerDay } from "@/server/reporting";
 
 function parseRange(params: { from?: string; to?: string }) {
   const to = params.to ? new Date(`${params.to}T23:59:59`) : new Date();
@@ -41,11 +41,12 @@ export default async function ReportsPage({
   const range = parseRange(params);
   const query = `from=${range.from.toISOString().slice(0, 10)}&to=${range.to.toISOString().slice(0, 10)}`;
 
-  const [stats, perDay, categories, agents] = await Promise.all([
+  const [stats, perDay, categories, agents, kb] = await Promise.all([
     overviewStats(range),
     ticketsPerDay(range),
     byCategory(range),
     byAgent(range),
+    kbStats(range),
   ]);
 
   return (
@@ -126,6 +127,53 @@ export default async function ReportsPage({
               )}
             </tbody>
           </table>
+        </div>
+      </div>
+
+      <div className="grid gap-4 lg:grid-cols-2">
+        <div className="rounded-lg border border-slate-200 bg-white p-4 shadow-sm">
+          <h2 className="mb-3 text-sm font-semibold">Wissensdatenbank: Artikel-Feedback</h2>
+          {kb.rated.length === 0 ? (
+            <p className="text-sm text-slate-400">Noch kein Feedback im Zeitraum.</p>
+          ) : (
+            <table className="w-full text-sm">
+              <thead>
+                <tr className="text-left text-xs uppercase text-slate-500">
+                  <th className="py-1">Artikel</th>
+                  <th className="py-1 text-right">👍</th>
+                  <th className="py-1 text-right">👎</th>
+                </tr>
+              </thead>
+              <tbody>
+                {kb.rated.map((a) => (
+                  <tr key={a.id} className="border-t border-slate-100">
+                    <td className="max-w-xs truncate py-1.5">
+                      <a href={`/kb/${a.slug}`} target="_blank" className="hover:text-blue-700 hover:underline">
+                        {a.title}
+                      </a>
+                    </td>
+                    <td className="py-1.5 text-right tabular-nums text-emerald-600">{a.up}</td>
+                    <td className="py-1.5 text-right tabular-nums text-red-600">{a.down}</td>
+                  </tr>
+                ))}
+              </tbody>
+            </table>
+          )}
+        </div>
+        <div className="rounded-lg border border-slate-200 bg-white p-4 shadow-sm">
+          <h2 className="mb-3 text-sm font-semibold">Suchen ohne Treffer (Doku-Lücken)</h2>
+          {kb.missedSearches.length === 0 ? (
+            <p className="text-sm text-slate-400">Keine erfolglosen Suchen im Zeitraum.</p>
+          ) : (
+            <ul className="space-y-1 text-sm">
+              {kb.missedSearches.map((m) => (
+                <li key={m.query} className="flex justify-between border-t border-slate-100 py-1.5 first:border-0">
+                  <span className="truncate">„{m.query}“</span>
+                  <span className="tabular-nums text-slate-500">{m.count}×</span>
+                </li>
+              ))}
+            </ul>
+          )}
         </div>
       </div>
 

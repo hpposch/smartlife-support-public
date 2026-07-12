@@ -76,6 +76,15 @@ export default async function KbHomePage({
       })
     : [];
 
+  // Suchen protokollieren — "Suchen ohne Treffer" zeigen Doku-Lücken (Reporting)
+  if (q?.trim()) {
+    await db.kbSearchQuery
+      .create({
+        data: { productId: product.id, query: q.trim().slice(0, 200), results: articles.length },
+      })
+      .catch(() => {});
+  }
+
   return (
     <div>
       {/* Hero mit einstellbarer Produktfarbe (Verwaltung → Produkte) */}

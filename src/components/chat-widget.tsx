@@ -25,6 +25,7 @@ export function ChatWidget({ loggedIn }: { loggedIn: boolean }) {
   const [error, setError] = useState<string | null>(null);
   const [ticketForm, setTicketForm] = useState<{ subject: string } | null>(null);
   const [email, setEmail] = useState("");
+  const [file, setFile] = useState<File | null>(null);
   const [ticketNumber, setTicketNumber] = useState<number | null>(null);
   const listRef = useRef<HTMLDivElement>(null);
 
@@ -84,15 +85,15 @@ export function ChatWidget({ loggedIn }: { loggedIn: boolean }) {
     setError(null);
     setBusy(true);
     try {
-      const response = await fetch("/api/chat/ticket", {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({
-          messages: history.slice(-16),
-          subject: ticketForm.subject,
-          ...(loggedIn ? {} : { email }),
-        }),
-      });
+      // FormData statt JSON, damit optional eine Datei mitgeschickt werden kann
+      const form = new FormData();
+      form.set("payload", JSON.stringify({
+        messages: history.slice(-16),
+        subject: ticketForm.subject,
+        ...(loggedIn ? {} : { email }),
+      }));
+      if (file) form.set("file", file);
+      const response = await fetch("/api/chat/ticket", { method: "POST", body: form });
       const json = await response.json();
       if (!response.ok) throw new Error(json?.error?.message ?? "Fehler");
       setTicketNumber(json.data.number);
@@ -184,6 +185,14 @@ export function ChatWidget({ loggedIn }: { loggedIn: boolean }) {
                 />
               </label>
             )}
+            <label className="block text-xs text-slate-500">
+              Anhang (optional, max. 10 MB)
+              <input
+                type="file"
+                onChange={(e) => setFile(e.target.files?.[0] ?? null)}
+                className="mt-1 block w-full text-xs"
+              />
+            </label>
             <p className="text-xs text-slate-400">Der komplette Chatverlauf wird dem Ticket beigefügt.</p>
             <div className="flex gap-2">
               <button

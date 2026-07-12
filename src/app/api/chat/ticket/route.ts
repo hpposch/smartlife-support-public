@@ -8,6 +8,7 @@ import { getCurrentContact } from "@/lib/portal-session";
 import { productForHost } from "@/lib/product";
 import { rateLimit } from "@/lib/ratelimit";
 import { textToHtml } from "@/lib/sanitize";
+import { attachUploads } from "@/lib/uploads";
 import { findOrCreateContact } from "@/server/contacts";
 import { CHAT_LIMITS, clampChat, formatTranscript } from "@/server/chat-assistant";
 import { createTicket, enqueueTicketConfirmation, finalizeNewTicket } from "@/server/tickets";
@@ -36,7 +37,16 @@ export async function POST(request: NextRequest) {
     );
   }
 
-  const json = await request.json().catch(() => null);
+  // multipart (Widget mit optionalem Anhang) oder JSON (API-Nutzung)
+  let json: unknown = null;
+  let uploadFile: FormDataEntryValue | null = null;
+  if (request.headers.get("content-type")?.includes("multipart/form-data")) {
+    const form = await request.formData().catch(() => null);
+    json = form ? JSON.parse(String(form.get("payload") ?? "null")) : null;
+    uploadFile = form?.get("file") ?? null;
+  } else {
+    json = await request.json().catch(() => null);
+  }
   const parsed = bodySchema.safeParse(json);
   if (!parsed.success) {
     return NextResponse.json(
@@ -80,7 +90,7 @@ export async function POST(request: NextRequest) {
     { subject: input.subject, channel: "chat", contactId: contact.id, productId: product.id },
     { contactId: contact.id }
   );
-  await db.message.create({
+  const message = await db.message.create({
     data: {
       ticketId: ticket.id,
       type: "customer",
@@ -89,6 +99,7 @@ export async function POST(request: NextRequest) {
       bodyHtml: textToHtml(transcript),
     },
   });
+  if (uploadFile) await attachUploads([uploadFile], message.id);
   await finalizeNewTicket(ticket.id);
   await enqueueTicketConfirmation(ticket.id);
 

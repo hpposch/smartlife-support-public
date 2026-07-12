@@ -388,13 +388,39 @@ model KbArticle {
   updatedAt    DateTime     @default(now()) @updatedAt @map("updated_at")
   productId    String       @map("product_id")
 
-  product  Product     @relation(fields: [productId], references: [id])
-  category KbCategory? @relation(fields: [categoryId], references: [id], onDelete: SetNull)
-  author   User?       @relation(fields: [authorId], references: [id], onDelete: SetNull)
+  product  Product      @relation(fields: [productId], references: [id])
+  category KbCategory?  @relation(fields: [categoryId], references: [id], onDelete: SetNull)
+  author   User?        @relation(fields: [authorId], references: [id], onDelete: SetNull)
+  feedback KbFeedback[]
 
   @@unique([productId, slug])
   @@index([status, visibility])
   @@map("kb_articles")
+}
+
+// Anonymes Artikel-Feedback („War dieser Artikel hilfreich?“)
+model KbFeedback {
+  id        String   @id @default(uuid())
+  articleId String   @map("article_id")
+  helpful   Boolean
+  createdAt DateTime @default(now()) @map("created_at")
+
+  article KbArticle @relation(fields: [articleId], references: [id], onDelete: Cascade)
+
+  @@index([articleId])
+  @@map("kb_feedback")
+}
+
+// Protokoll der Hilfe-Center-Suchen (für "Suchen ohne Treffer" im Reporting)
+model KbSearchQuery {
+  id        String   @id @default(uuid())
+  productId String   @map("product_id")
+  query     String
+  results   Int
+  createdAt DateTime @default(now()) @map("created_at")
+
+  @@index([productId, createdAt])
+  @@map("kb_search_queries")
 }
 
 // ---------------------------------------------------------------------------

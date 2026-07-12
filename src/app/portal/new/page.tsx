@@ -4,6 +4,7 @@ import { db } from "@/lib/db";
 import { requireContact } from "@/lib/portal-session";
 import { currentProduct } from "@/lib/product";
 import { textToHtml } from "@/lib/sanitize";
+import { attachUploads } from "@/lib/uploads";
 import { createTicket, enqueueTicketConfirmation, finalizeNewTicket } from "@/server/tickets";
 
 const schema = z.object({
@@ -32,7 +33,7 @@ async function createPortalTicket(formData: FormData) {
     },
     { contactId: contact.id }
   );
-  await db.message.create({
+  const message = await db.message.create({
     data: {
       ticketId: ticket.id,
       type: "customer",
@@ -41,6 +42,7 @@ async function createPortalTicket(formData: FormData) {
       bodyHtml: textToHtml(input.body),
     },
   });
+  await attachUploads(formData.getAll("files"), message.id);
   await finalizeNewTicket(ticket.id);
   await enqueueTicketConfirmation(ticket.id);
   redirect(`/portal/tickets/${ticket.id}`);
@@ -74,6 +76,10 @@ export default async function PortalNewTicketPage() {
             placeholder="Beschreiben Sie Ihr Anliegen so genau wie möglich …"
             className="input mt-1"
           />
+        </label>
+        <label className="block text-xs font-medium text-slate-500">
+          Anhänge (optional, max. 5 Dateien à 10 MB)
+          <input name="files" type="file" multiple className="input mt-1" />
         </label>
         <label className="block text-xs font-medium text-slate-500">
           Kategorie

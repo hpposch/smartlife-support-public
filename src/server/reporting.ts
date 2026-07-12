@@ -107,6 +107,44 @@ export async function byAgent(range: ReportRange) {
     .sort((a, b) => b.resolved - a.resolved);
 }
 
+/** Wissensdatenbank-Auswertung: Feedback je Artikel und Suchen ohne Treffer. */
+export async function kbStats(range: ReportRange) {
+  const feedback = await db.kbFeedback.groupBy({
+    by: ["articleId", "helpful"],
+    where: { createdAt: { gte: range.from, lte: range.to } },
+    _count: true,
+  });
+  const byArticle = new Map<string, { up: number; down: number }>();
+  for (const row of feedback) {
+    const entry = byArticle.get(row.articleId) ?? { up: 0, down: 0 };
+    if (row.helpful) entry.up += row._count;
+    else entry.down += row._count;
+    byArticle.set(row.articleId, entry);
+  }
+  const articles = await db.kbArticle.findMany({
+    where: { id: { in: [...byArticle.keys()] } },
+    select: { id: true, title: true, slug: true },
+  });
+  const rated = articles
+    .map((a) => ({ ...a, ...byArticle.get(a.id)! }))
+    .sort((a, b) => b.down - a.down || a.up - b.up)
+    .slice(0, 10);
+
+  // Häufigste Suchen ohne Treffer (Doku-Lücken)
+  const missed = await db.kbSearchQuery.groupBy({
+    by: ["query"],
+    where: { createdAt: { gte: range.from, lte: range.to }, results: 0 },
+    _count: true,
+    orderBy: { _count: { query: "desc" } },
+    take: 10,
+  });
+
+  return {
+    rated,
+    missedSearches: missed.map((m) => ({ query: m.query, count: m._count })),
+  };
+}
+
 // --------------------------------------------------------------------------
 // CSV
 // --------------------------------------------------------------------------

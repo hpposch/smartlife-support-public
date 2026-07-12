@@ -19,6 +19,10 @@ async function main() {
   // Wiederkehrende Jobs (ein Scheduler-Eintrag je Job, überlebt Neustarts)
   await queues().mailPoll.upsertJobScheduler("poll-all", { every: POLL_INTERVAL_MS });
   await queues().backup.upsertJobScheduler("daily-backup", { pattern: BACKUP_CRON });
+  // Aufbewahrungsfrist (DSGVO): Inhalte alter geschlossener Tickets schwärzen
+  if (Number(process.env.RETENTION_ANONYMIZE_DAYS) > 0) {
+    await queues().backup.upsertJobScheduler("retention", { pattern: "30 4 * * *" });
+  }
   await queues().slaCheck.upsertJobScheduler("sla-check", { every: 5 * 60_000 });
   await queues().timeRules.upsertJobScheduler("time-rules", { every: 15 * 60_000 });
 
@@ -60,7 +64,16 @@ async function main() {
 
     new Worker(
       "backup",
-      async () => {
+      async (job) => {
+        if (job.name === "retention") {
+          const days = Number(process.env.RETENTION_ANONYMIZE_DAYS);
+          if (days > 0) {
+            const { enforceRetention } = await import("@/server/privacy");
+            const count = await enforceRetention(days);
+            if (count > 0) console.log(`[retention] ${count} alte Tickets geschwärzt (> ${days} Tage geschlossen)`);
+          }
+          return;
+        }
         const info = await createBackup();
         console.log(
           `[backup] ${info.fileName} erstellt (${(info.sizeBytes / 1024 / 1024).toFixed(1)} MB)`

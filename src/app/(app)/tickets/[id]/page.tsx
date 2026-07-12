@@ -296,6 +296,12 @@ export default async function TicketDetailPage({
           >
             Alle Tickets dieses Kunden →
           </Link>
+          <Link
+            href={`/contacts/${ticket.contact.id}/privacy`}
+            className="mt-1 block text-xs text-slate-400 hover:text-slate-600 hover:underline"
+          >
+            Datenschutz (Auskunft/Anonymisierung)
+          </Link>
         </div>
 
         <div className="rounded-lg border border-slate-200 bg-white p-4 shadow-sm">

@@ -5,6 +5,7 @@ import { db } from "@/lib/db";
 import { requireContact } from "@/lib/portal-session";
 import { currentProduct } from "@/lib/product";
 import { STATUS_COLORS, STATUS_LABELS, formatDateTime } from "@/lib/labels";
+import { attachUploads } from "@/lib/uploads";
 import { addCustomerMessage } from "@/server/messages";
 import { updateTicket } from "@/server/tickets";
 
@@ -39,11 +40,12 @@ async function portalReply(formData: FormData) {
     body: formData.get("body"),
   });
   const { contact, ticket } = await loadOwnTicket(input.ticketId);
-  await addCustomerMessage({
+  const message = await addCustomerMessage({
     ticketId: ticket.id,
     contactId: contact.id,
     bodyText: input.body.trim(),
   });
+  await attachUploads(formData.getAll("files"), message.id);
   revalidatePath(`/portal/tickets/${ticket.id}`);
 }
 
@@ -141,6 +143,10 @@ export default async function PortalTicketPage({
             placeholder="Ihre Antwort …"
             className="input"
           />
+          <label className="mt-2 block text-xs font-medium text-slate-500">
+            Anhänge (optional, max. 5 Dateien à 10 MB)
+            <input name="files" type="file" multiple className="input mt-1" />
+          </label>
           <div className="mt-3 flex items-center justify-between">
             <button type="submit" className="btn-primary">
               Antwort senden
