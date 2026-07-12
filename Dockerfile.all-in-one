@@ -38,7 +38,11 @@ COPY --from=deps /app/node_modules ./node_modules
 COPY --from=build /app/.next ./.next
 COPY --from=build /app/public ./public
 COPY . .
-RUN npx prisma generate && chmod +x docker/all-in-one-start.sh docker/import-kb.sh
+# sed entfernt CRLF-Zeilenenden, falls der Build-Kontext von einem
+# Windows-Checkout stammt — bash akzeptiert Skripte nur mit LF
+RUN npx prisma generate \
+    && sed -i 's/\r$//' docker/*.sh \
+    && chmod +x docker/all-in-one-start.sh docker/import-kb.sh
 
 VOLUME /data
 EXPOSE 3000
