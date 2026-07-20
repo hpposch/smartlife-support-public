@@ -10,7 +10,14 @@
 //
 //   HELP_SUPPORT_URL   Ziel für support.boldbi.com-Links (Standard: APP_URL
 //                      bzw. http://localhost:3000 — das eigene Support-Portal)
-import { readdirSync, readFileSync, writeFileSync, copyFileSync, existsSync, statSync } from "node:fs";
+//   HELP_VIDEOS_DIR    Ordner mit eigenen Video-Aufnahmen (.mp4/.webm).
+//                      YouTube-Embeds von Bold BI werden IMMER entfernt:
+//                      Liegt ein passendes eigenes Video vor, erscheint statt-
+//                      dessen ein selbst gehosteter Player (/videos/…); sonst
+//                      wird der Videoblock samt Hinweissatz ausgeblendet.
+//                      Dateinamen: s. VIDEO_NAMES unten oder <youtube-id>.mp4
+//                      (Drehbuch für die Aufnahmen: docs/video-drehbuch.md)
+import { readdirSync, readFileSync, writeFileSync, copyFileSync, existsSync, statSync, mkdirSync } from "node:fs";
 import path from "node:path";
 
 const BRAND_PRODUCT = "smartlife BI"; // ersetzt "Bold BI"
@@ -28,6 +35,63 @@ if (!SITE_DIR || !existsSync(path.join(SITE_DIR, "index.html"))) {
   process.exit(1);
 }
 const ROOT = path.resolve(SITE_DIR);
+
+// --- Eigene Videos statt der Bold-BI-YouTube-Embeds -------------------------
+// Sprechende Dateinamen für die bekannten Videos; neue Embeds in künftigen
+// Doku-Ständen funktionieren automatisch über <youtube-id>.mp4
+const VIDEO_NAMES: Record<string, string> = {
+  k6yeUz0NqQ4: "creating-dashboard",
+  OXISapzYAj8: "embedding-in-your-application",
+  oeHEcOVd634: "activate-ai-feature",
+  "6KfzY3tpOG8": "ai-copilot-getting-started",
+};
+const VIDEO_EXT = [".mp4", ".webm"];
+const VIDEOS_DIR = process.env.HELP_VIDEOS_DIR ?? "";
+
+// youtube-id → Dateiname des bereitgestellten Videos (oder undefined = ausblenden)
+const videoFiles = new Map<string, string>();
+function videoFileFor(youtubeId: string): string | undefined {
+  if (videoFiles.has(youtubeId)) return videoFiles.get(youtubeId);
+  let found: string | undefined;
+  if (VIDEOS_DIR) {
+    for (const base of [VIDEO_NAMES[youtubeId], youtubeId]) {
+      if (!base) continue;
+      for (const ext of VIDEO_EXT) {
+        if (existsSync(path.join(VIDEOS_DIR, base + ext))) {
+          found = base + ext;
+          break;
+        }
+      }
+      if (found) break;
+    }
+  }
+  videoFiles.set(youtubeId, found as string);
+  return found;
+}
+
+// Optik des Original-iframes (#md-content iframe) als Inline-Stil, da der
+// <video>-Tag von der Site-CSS-Regel nicht erfasst wird
+const VIDEO_STYLE =
+  "margin-top:20px;display:block;width:100%;max-width:80%;aspect-ratio:16/9;height:auto;min-height:240px;background:#000";
+
+// Ersetzt YouTube-iframes; wird kein eigenes Video gefunden, verschwindet der
+// Block mitsamt dem unmittelbar davorstehenden Hinweissatz („Watch this video …“).
+// jsonEscaped: in page-data.json sind die Anführungszeichen als \" kodiert.
+// (\s|\\n)* — in page-data.json stehen Zeilenumbrüche als \n-Literal im String
+const IFRAME_RE =
+  /(<p>(?:[^<]|<(?!\/p>))*?(?:video|watch)(?:[^<]|<(?!\/p>))*?<\/p>(?:\s|\\n)*)?<iframe[^>]*youtube(?:-nocookie)?\.com\/embed\/([A-Za-z0-9_-]+)[^>]*>(?:\s|\\n)*<\/iframe>/gi;
+function replaceVideos(content: string, jsonEscaped: boolean): string {
+  return content.replace(IFRAME_RE, (_match, intro: string | undefined, youtubeId: string) => {
+    const file = videoFileFor(youtubeId);
+    if (!file) return ""; // kein eigenes Video → Absatz + Player komplett raus
+    const q = jsonEscaped ? '\\"' : '"';
+    return (
+      (intro ?? "") +
+      `<video class=${q}helpsite-video-section${q} controls preload=${q}metadata${q} ` +
+      `style=${q}${VIDEO_STYLE}${q} src=${q}/videos/${file}${q}></video>`
+    );
+  });
+}
 
 function rebrand(content: string): string {
   return (
@@ -73,9 +137,13 @@ function walk(dir: string) {
       continue;
     }
     files++;
-    if (!TEXT_EXT.has(path.extname(entry.name).toLowerCase())) continue;
+    const ext = path.extname(entry.name).toLowerCase();
+    if (!TEXT_EXT.has(ext)) continue;
     const before = readFileSync(full, "utf8");
-    const after = rebrand(before);
+    let after = rebrand(before);
+    // Artikel-HTML steckt in den Seiten (SSR) UND in page-data.json (Hydration) —
+    // beide identisch behandeln, sonst meckert React beim Hydrieren
+    if (ext === ".html" || ext === ".json") after = replaceVideos(after, ext === ".json");
     if (after !== before) {
       writeFileSync(full, after);
       patched++;
@@ -84,6 +152,20 @@ function walk(dir: string) {
 }
 
 walk(ROOT);
+
+// Bereitgestellte eigene Videos in die Site kopieren
+const usedVideos = [...new Set([...videoFiles.values()].filter(Boolean))] as string[];
+if (usedVideos.length) {
+  mkdirSync(path.join(ROOT, "videos"), { recursive: true });
+  for (const file of usedVideos) {
+    copyFileSync(path.join(VIDEOS_DIR, file), path.join(ROOT, "videos", file));
+  }
+}
+const hidden = [...videoFiles.entries()].filter(([, f]) => !f).map(([id]) => id);
+console.log(
+  `Videos: ${usedVideos.length} eigene eingebunden${usedVideos.length ? ` (${usedVideos.join(", ")})` : ""}, ` +
+    `${hidden.length} YouTube-Embeds ausgeblendet${hidden.length ? ` (${hidden.join(", ")} — Aufnahme s. docs/video-drehbuch.md)` : ""}`
+);
 
 // Logos ersetzen (Header hell/dunkel)
 let logos = 0;

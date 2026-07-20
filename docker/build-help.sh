@@ -21,6 +21,14 @@ if [ -z "${HELP_SUPPORT_URL:-}" ] && [ -f /data/app.env ]; then
   export HELP_SUPPORT_URL="${APP_URL:-}"
 fi
 
+# Eigene Video-Aufnahmen (statt der Bold-BI-YouTube-Embeds): Ordner mit
+# .mp4/.webm-Dateien, Standard-Mount /import/help-videos — Dateinamen und
+# Drehbuch s. docs/video-drehbuch.md. Ohne eigenes Video wird der jeweilige
+# Videoblock ausgeblendet (kein Bold-BI-YouTube im Portal).
+if [ -z "${HELP_VIDEOS_DIR:-}" ] && [ -d /import/help-videos ]; then
+  export HELP_VIDEOS_DIR=/import/help-videos
+fi
+
 # 1) Repo in ein beschreibbares Build-Verzeichnis kopieren (der Mount ist
 #    read-only; gulp/gatsby schreiben in ./static, ./src/pages, ./public, …).
 #    .git kommt mit: gatsby-node.js liest daraus das "Updated"-Datum jeder Seite.

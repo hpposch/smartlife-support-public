@@ -177,6 +177,8 @@ HELP_SITE_DIR=/tmp/bold-bi-docs/public npx tsx scripts/help-server.ts   # Port p
 
 Für Doku-Updates: `git pull` im Docs-Repo, dann Build + Rebranding erneut ausführen. Hinweis: `gulp` meldet auch bei einem fehlgeschlagenen `gatsby build` Erfolg — maßgeblich ist, ob `public/index.html` erzeugt wurde (das Container-Skript prüft das automatisch).
 
+**Videos:** Die Doku bettet an 4 Stellen YouTube-Videos von Bold BI ein. Diese werden beim Rebranding **immer entfernt** (kein Bold-BI-Branding, keine Google-Requests). Eigene Aufnahmen der white-labeled Instanz ersetzen sie: `.mp4`/`.webm`-Dateien in einen Video-Ordner legen (`HELP_VIDEOS_DIR`, im Container `-v …\help-videos:/import/help-videos:ro`) und den Build erneut ausführen — dann erscheint ein selbst gehosteter Player (`/videos/…`). Solange eine Aufnahme fehlt, wird der Videoblock samt Hinweissatz ausgeblendet. Dateinamen, Inhalte und Aufnahme-Tipps: [`docs/video-drehbuch.md`](docs/video-drehbuch.md).
+
 **Im All-in-One-Container** läuft der Help-Server automatisch mit (Port 3001 freigeben und das Docs-Repo einhängen, s. „Schnelltest“). Solange die Site noch nicht gebaut wurde, zeigt Port 3001 eine Hinweisseite mit dem Build-Befehl.
 
 **Aufräumen:** Wer die Doku früher in die Wissensdatenbank importiert hat, entfernt diese importierten Artikel (manuell angelegte bleiben unberührt) mit:

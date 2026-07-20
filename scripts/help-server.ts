@@ -27,6 +27,8 @@ const TYPES: Record<string, string> = {
   ".webp": "image/webp",
   ".svg": "image/svg+xml",
   ".ico": "image/x-icon",
+  ".mp4": "video/mp4",
+  ".webm": "video/webm",
 };
 
 const PLACEHOLDER = `<!DOCTYPE html><html lang="de"><meta charset="utf-8"><title>Help-Portal</title>
@@ -71,11 +73,34 @@ createServer(async (req, res) => {
     }
 
     const ext = path.extname(filePath).toLowerCase();
-    res.writeHead(200, {
+    const headers: Record<string, string> = {
       "Content-Type": TYPES[ext] ?? "application/octet-stream",
-      "Content-Length": String(info.size),
       "Cache-Control": ext === ".html" ? "no-cache" : "public, max-age=86400",
       "X-Content-Type-Options": "nosniff",
+    };
+
+    // Range-Requests (Video-Player spulen damit): bytes=start-end
+    const range = /^bytes=(\d*)-(\d*)$/.exec(req.headers.range ?? "");
+    if (range && (range[1] || range[2]) && (ext === ".mp4" || ext === ".webm")) {
+      const start = range[1] ? Number(range[1]) : Math.max(0, info.size - Number(range[2]));
+      const end = range[1] && range[2] ? Math.min(Number(range[2]), info.size - 1) : info.size - 1;
+      if (start > end || start >= info.size) {
+        res.writeHead(416, { "Content-Range": `bytes */${info.size}` });
+        return res.end();
+      }
+      res.writeHead(206, {
+        ...headers,
+        "Accept-Ranges": "bytes",
+        "Content-Range": `bytes ${start}-${end}/${info.size}`,
+        "Content-Length": String(end - start + 1),
+      });
+      return createReadStream(filePath, { start, end }).pipe(res);
+    }
+
+    res.writeHead(200, {
+      ...headers,
+      "Accept-Ranges": "bytes",
+      "Content-Length": String(info.size),
     });
     createReadStream(filePath).pipe(res);
   } catch (error) {
