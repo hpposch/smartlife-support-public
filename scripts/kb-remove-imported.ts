@@ -1,6 +1,6 @@
 // Entfernt die per import-boldbi-docs.ts importierten DOKU-Artikel aus der
 // Support-Wissensdatenbank (erkennbar am Hash-Suffix der Slugs) — die Doku
-// lebt jetzt im eigenständigen Help-Portal (scripts/build-help-site.ts).
+// lebt jetzt im eigenständigen Help-Portal (docker/build-help.sh).
 // Manuell angelegte KB-Artikel bleiben unangetastet.
 //
 // Aufruf: npx tsx scripts/kb-remove-imported.ts [produkt-kürzel] [--ja]

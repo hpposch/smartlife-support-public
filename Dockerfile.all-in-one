@@ -42,7 +42,7 @@ COPY . .
 # Windows-Checkout stammt — bash akzeptiert Skripte nur mit LF
 RUN npx prisma generate \
     && sed -i 's/\r$//' docker/*.sh \
-    && chmod +x docker/all-in-one-start.sh docker/import-kb.sh
+    && chmod +x docker/all-in-one-start.sh docker/import-kb.sh docker/build-help.sh
 
 VOLUME /data
 # 3000 = Support-System, 3001 = eigenständiges Help-Portal (Doku)

@@ -5,7 +5,8 @@
 //   HELP_SITE_DIR  Verzeichnis der gebauten Site (Standard ./data/help-site,
 //                  im All-in-One-Container /data/help-site)
 //
-// Bauen der Site: npx tsx scripts/build-help-site.ts <bold-bi-docs>
+// Bauen der Site: Original-Pipeline des Doku-Repos (npm run production-build),
+// danach scripts/rebrand-help-site.ts — im Container: docker/build-help.sh
 import { createReadStream, existsSync } from "node:fs";
 import { stat } from "node:fs/promises";
 import { createServer } from "node:http";

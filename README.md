@@ -160,18 +160,22 @@ Produktbezogen sind außerdem: Absendername („\<Produkt\> Support") und Signat
 
 Die komplette Produktdokumentation (Stil `help.smartlifebi.com/getting-started/`) ist **kein Teil der Support-Wissensdatenbank**, sondern ein eigenständiges, statisches Help-Portal, das **parallel auf einem eigenen Port (3001)** läuft. Die Wissensdatenbank unter `/kb` bleibt dem Support-Portal vorbehalten — für kuratierte Support-Artikel (How-tos, bekannte Probleme, FAQs).
 
-Das Help-Portal wird aus dem [boldbi/bold-bi-docs](https://github.com/boldbi/bold-bi-docs)-Repo generiert: ~890 Seiten mit Original-URL-Struktur (`/getting-started/…`, `/working-with-dashboards/…`), Sidebar-Navigation nach Abschnitten, Titel-Suche, allen Bildern — und durchgängigem Rebranding **„Bold BI" → „smartlife BI"**, **„Syncfusion" → „smartlife"** (Links auf `help.boldbi.com` werden intern, `support.boldbi.com` zeigt auf das Support-Portal).
+Gebaut wird mit der **Original-Build-Pipeline des Doku-Repos** — [boldbi/bold-bi-docs](https://github.com/boldbi/bold-bi-docs) bringt einen fertigen Gulp/Gatsby-Build mit (`npm run production-build` = `gulp build` + `gatsby build` → fertige HTML-Site in `public/`), inklusive Original-Layout, Sidebar-Navigation, Suche und Dark Mode. Danach läuft nur noch `scripts/rebrand-help-site.ts` über die fertige Ausgabe und tauscht **„Bold BI" → „smartlife BI"**, **„Syncfusion" → „smartlife"**, Logos und Favicons; Links auf `help.boldbi.com` werden intern, `support.boldbi.com` zeigt auf das Support-Portal (`HELP_SUPPORT_URL`, Standard = `APP_URL`), `www.boldbi.com`/`syncfusion.com` auf die eigene Website. Außerdem wird der Google-Tag-Manager entfernt. Da die Site eine Gatsby/React-App ist, patcht das Skript HTML, `page-data.json` **und** JS-Bundles.
 
 ```bash
-# Site bauen (lokal; Ausgabe: ./data/help-site bzw. $HELP_SITE_DIR)
+# 1) Original-Build im Doku-Repo (einmalig npm install, ~2 GB node_modules)
 git clone --depth 1 https://github.com/boldbi/bold-bi-docs.git /tmp/bold-bi-docs
-npx tsx scripts/build-help-site.ts /tmp/bold-bi-docs
+cd /tmp/bold-bi-docs
+cp src/templates/layout.js src/templates/Layout.js   # Linux: Groß-/Kleinschreibung
+npm install && npm run production-build              # → fertige Site in public/
 
-# Server starten (Port per HELP_PORT, Standard 3001)
-npx tsx scripts/help-server.ts
+# 2) Rebranding über die fertige Site + Server starten
+cd /pfad/zur/installation
+npx tsx scripts/rebrand-help-site.ts /tmp/bold-bi-docs/public
+HELP_SITE_DIR=/tmp/bold-bi-docs/public npx tsx scripts/help-server.ts   # Port per HELP_PORT, Standard 3001
 ```
 
-Einstellbar per Umgebungsvariablen beim Bauen: `HELP_SITE_NAME` (Titel, Standard „smartlife BI Docs“), `HELP_ACCENT` (Akzentfarbe, Standard `#7c3aed`), `HELP_SUPPORT_URL` („Support kontaktieren“-Link, Standard = `APP_URL`). Für Doku-Updates: `git pull` im Docs-Repo, Build erneut ausführen — der Server liefert sofort die neue Site.
+Für Doku-Updates: `git pull` im Docs-Repo, dann Build + Rebranding erneut ausführen. Hinweis: `gulp` meldet auch bei einem fehlgeschlagenen `gatsby build` Erfolg — maßgeblich ist, ob `public/index.html` erzeugt wurde (das Container-Skript prüft das automatisch).
 
 **Im All-in-One-Container** läuft der Help-Server automatisch mit (Port 3001 freigeben und das Docs-Repo einhängen, s. „Schnelltest“). Solange die Site noch nicht gebaut wurde, zeigt Port 3001 eine Hinweisseite mit dem Build-Befehl.
 
@@ -249,7 +253,7 @@ docker run -d --name smartlife-support -p 3000:3000 -p 3001:3001 -v smartlife-da
   smartlife-support:all-in-one
 ```
 
-**Help-Portal im Container bauen:** Das bold-bi-docs-Repo auf dem Host clonen, beim Start read-only einhängen und die Site im Container generieren (Ergebnis liegt im Volume unter `/data/help-site` und überlebt Neustarts):
+**Help-Portal im Container bauen:** Das bold-bi-docs-Repo auf dem Host clonen, beim Start read-only einhängen und die Site im Container mit der Original-Pipeline (gulp + gatsby) bauen. Der erste Lauf installiert die Build-Abhängigkeiten des Doku-Repos (einige Minuten, ~2 GB unter `/data/help-build`); danach geht es deutlich schneller. Das Ergebnis liegt im Volume unter `/data/help-site` und überlebt Neustarts:
 
 ```bash
 git clone https://github.com/boldbi/bold-bi-docs.git
