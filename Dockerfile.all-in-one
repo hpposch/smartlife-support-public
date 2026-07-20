@@ -45,7 +45,8 @@ RUN npx prisma generate \
     && chmod +x docker/all-in-one-start.sh docker/import-kb.sh
 
 VOLUME /data
-EXPOSE 3000
+# 3000 = Support-System, 3001 = eigenständiges Help-Portal (Doku)
+EXPOSE 3000 3001
 HEALTHCHECK --interval=30s --timeout=5s --start-period=60s --retries=3 \
   CMD curl -fsS http://localhost:3000/api/health || exit 1
 CMD ["bash", "docker/all-in-one-start.sh"]

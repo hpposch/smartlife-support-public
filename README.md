@@ -156,9 +156,35 @@ Produktbezogen sind außerdem: Absendername („\<Produkt\> Support") und Signat
 
 **Portal-Branding (einstellbar pro Produkt):** Das Hilfe-Center hat einen farbigen Hero-Bereich mit zentrierter Suche und Kategorie-Karten mit Icons — im Stil gängiger Support-Portale. Unter *Verwaltung → Produkte* lassen sich **Portalfarbe** (Hero-Hintergrund, Buttons, Akzente) und **Logo** (erscheint im Kopfbereich von Hilfe-Center und Portal) je Produkt festlegen; unter *Verwaltung → Wissensdatenbank* bekommt jede Kategorie optional ein eigenes **Icon** (PNG/JPG/SVG/WebP, ohne Icon: neutrales Ordner-Symbol in der Portalfarbe). Ohne Einstellungen gilt das bisherige Blau.
 
-### Wissensdatenbank: Bold-BI-Doku importieren (Rebranding auf smartlife BI)
+### Help-Portal (Produkt-Doku) — eigenständig auf Port 3001
 
-Importiert alle ~890 Artikel aus [boldbi/bold-bi-docs](https://github.com/boldbi/bold-bi-docs) in das Hilfe-Center — inkl. Bilder, Kategorien und umgeschriebener interner Links. Dabei wird durchgängig **„Bold BI" → „smartlife BI"** und **„Syncfusion" → „smartlife"** ersetzt (anpassbar über die Konstanten am Skriptanfang).
+Die komplette Produktdokumentation (Stil `help.smartlifebi.com/getting-started/`) ist **kein Teil der Support-Wissensdatenbank**, sondern ein eigenständiges, statisches Help-Portal, das **parallel auf einem eigenen Port (3001)** läuft. Die Wissensdatenbank unter `/kb` bleibt dem Support-Portal vorbehalten — für kuratierte Support-Artikel (How-tos, bekannte Probleme, FAQs).
+
+Das Help-Portal wird aus dem [boldbi/bold-bi-docs](https://github.com/boldbi/bold-bi-docs)-Repo generiert: ~890 Seiten mit Original-URL-Struktur (`/getting-started/…`, `/working-with-dashboards/…`), Sidebar-Navigation nach Abschnitten, Titel-Suche, allen Bildern — und durchgängigem Rebranding **„Bold BI" → „smartlife BI"**, **„Syncfusion" → „smartlife"** (Links auf `help.boldbi.com` werden intern, `support.boldbi.com` zeigt auf das Support-Portal).
+
+```bash
+# Site bauen (lokal; Ausgabe: ./data/help-site bzw. $HELP_SITE_DIR)
+git clone --depth 1 https://github.com/boldbi/bold-bi-docs.git /tmp/bold-bi-docs
+npx tsx scripts/build-help-site.ts /tmp/bold-bi-docs
+
+# Server starten (Port per HELP_PORT, Standard 3001)
+npx tsx scripts/help-server.ts
+```
+
+Einstellbar per Umgebungsvariablen beim Bauen: `HELP_SITE_NAME` (Titel, Standard „smartlife BI Docs“), `HELP_ACCENT` (Akzentfarbe, Standard `#7c3aed`), `HELP_SUPPORT_URL` („Support kontaktieren“-Link, Standard = `APP_URL`). Für Doku-Updates: `git pull` im Docs-Repo, Build erneut ausführen — der Server liefert sofort die neue Site.
+
+**Im All-in-One-Container** läuft der Help-Server automatisch mit (Port 3001 freigeben und das Docs-Repo einhängen, s. „Schnelltest“). Solange die Site noch nicht gebaut wurde, zeigt Port 3001 eine Hinweisseite mit dem Build-Befehl.
+
+**Aufräumen:** Wer die Doku früher in die Wissensdatenbank importiert hat, entfernt diese importierten Artikel (manuell angelegte bleiben unberührt) mit:
+
+```bash
+npx tsx scripts/kb-remove-imported.ts --ja            # Standard-Produkt
+npx tsx scripts/kb-remove-imported.ts smartlifebi --ja # bestimmtes Produkt
+```
+
+### Wissensdatenbank: Bold-BI-Doku importieren (Alternative zum Help-Portal)
+
+Wer die Doku stattdessen (oder zusätzlich) **in** der Support-Wissensdatenbank haben will: Dieser Import bringt alle ~890 Artikel aus [boldbi/bold-bi-docs](https://github.com/boldbi/bold-bi-docs) in das Hilfe-Center — inkl. Bilder, Kategorien und umgeschriebener interner Links. Dabei wird durchgängig **„Bold BI" → „smartlife BI"** und **„Syncfusion" → „smartlife"** ersetzt (anpassbar über die Konstanten am Skriptanfang). Empfehlung: Doku ins Help-Portal (s. oben), KB für eigene Support-Artikel.
 
 Voraussetzung für den lokalen Lauf: eingerichtete Entwicklungsumgebung (`npm install`, `.env` mit `DATABASE_URL`, laufende Datenbank — s. „Entwicklung starten“). Im All-in-One-Container geht es ohne all das mit einem `docker exec` (s. „Schnelltest“).
 
@@ -210,30 +236,38 @@ Zum schnellen Ausprobieren gibt es ein All-in-One-Image (`Dockerfile.all-in-one`
 
 ```bash
 docker build -f Dockerfile.all-in-one -t smartlife-support:all-in-one .
-docker run -d --name smartlife-support -p 3000:3000 \
+docker run -d --name smartlife-support -p 3000:3000 -p 3001:3001 \
   -v smartlife-data:/data smartlife-support:all-in-one
 ```
 
-Danach läuft alles auf http://localhost:3000 — Login: `admin@smartlife.software` / `admin1234`. Beim ersten Start werden Datenbank, Schema und Grunddaten automatisch angelegt; ein `SESSION_SECRET` wird erzeugt und im Volume abgelegt. Alle Daten (Datenbank, Anhänge, Backups) liegen unter `/data` — mit dem Volume überleben sie Container-Neustarts und Image-Updates (`docker stop` fährt Postgres geordnet herunter). Optionale Einstellungen wie `SEED_ADMIN_*`, KI-Variablen oder `POSTGRES_PASSWORD` lassen sich per `-e` mitgeben, z. B.:
+Danach läuft alles auf http://localhost:3000 (Support-System) und http://localhost:3001 (Help-Portal, s. u.) — Login: `admin@smartlife.software` / `admin1234`. Beim ersten Start werden Datenbank, Schema und Grunddaten automatisch angelegt; ein `SESSION_SECRET` wird erzeugt und im Volume abgelegt. Alle Daten (Datenbank, Anhänge, Backups) liegen unter `/data` — mit dem Volume überleben sie Container-Neustarts und Image-Updates (`docker stop` fährt Postgres geordnet herunter). Optionale Einstellungen wie `SEED_ADMIN_*`, KI-Variablen oder `POSTGRES_PASSWORD` lassen sich per `-e` mitgeben, z. B.:
 
 ```bash
-docker run -d --name smartlife-support -p 3000:3000 -v smartlife-data:/data \
+docker run -d --name smartlife-support -p 3000:3000 -p 3001:3001 -v smartlife-data:/data \
   -e SEED_ADMIN_EMAIL=office@smartlife.software -e SEED_ADMIN_PASSWORD=geheim \
   -e AI_BASE_URL=https://api.openai.com/v1 -e AI_API_KEY=sk-… -e AI_MODEL=gpt-4o \
   smartlife-support:all-in-one
 ```
 
-**Wissensdatenbank im Container importieren:** Das bold-bi-docs-Repo auf dem Host clonen, beim Start read-only einhängen und den Import im Container ausführen — Rebranding, Link-Umschreibung und Logo-Ersetzung laufen dabei automatisch mit (Python/OpenCV ist im Image enthalten):
+**Help-Portal im Container bauen:** Das bold-bi-docs-Repo auf dem Host clonen, beim Start read-only einhängen und die Site im Container generieren (Ergebnis liegt im Volume unter `/data/help-site` und überlebt Neustarts):
 
 ```bash
 git clone https://github.com/boldbi/bold-bi-docs.git
-docker run -d --name smartlife-support -p 3000:3000 \
+docker run -d --name smartlife-support -p 3000:3000 -p 3001:3001 \
   -v smartlife-data:/data \
   -v ./bold-bi-docs:/import/bold-bi-docs:ro \
   smartlife-support:all-in-one
+docker exec smartlife-support bash docker/build-help.sh /import/bold-bi-docs
+```
+
+Danach ist die Doku auf http://localhost:3001 erreichbar. Für Doku-Updates später: `git pull` im bold-bi-docs-Ordner, dann denselben `docker exec`-Befehl erneut.
+
+**Alternativ — Doku in die Wissensdatenbank importieren** (s. Abschnitt oben; Logo-Ersetzung in Screenshots läuft automatisch mit, Python/OpenCV ist im Image enthalten):
+
+```bash
 docker exec smartlife-support bash docker/import-kb.sh /import/bold-bi-docs
 ```
 
-Für Doku-Updates später: `git pull` im bold-bi-docs-Ordner, dann denselben `docker exec`-Befehl erneut (mit `--prune` werden entfallene Artikel gelöscht; ausgeblendete Artikel/Kategorien bleiben ausgeblendet).
+Früher importierte Doku-Artikel wieder aus der KB entfernen: `docker exec smartlife-support npx tsx scripts/kb-remove-imported.ts --ja`
 
 Für den Dauerbetrieb ist weiterhin `docker-compose.yml` (getrennte Dienste, getrennte Volumes) die richtige Wahl.

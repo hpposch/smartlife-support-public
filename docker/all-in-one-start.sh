@@ -8,6 +8,8 @@ PG_BIN=/usr/lib/postgresql/16/bin
 export PGDATA="${PGDATA:-/data/postgres}"
 export DATA_DIR="${DATA_DIR:-/data/app}"
 export BACKUP_DIR="${BACKUP_DIR:-/data/backups}"
+export HELP_SITE_DIR="${HELP_SITE_DIR:-/data/help-site}"
+export HELP_PORT="${HELP_PORT:-3001}"
 REDIS_DIR=/data/redis
 
 DB_USER=smartlife
@@ -85,12 +87,14 @@ npm run db:seed
 # --- Sauberes Herunterfahren bei docker stop ---
 WEB_PID=""
 WORKER_PID=""
+HELP_PID=""
 stop_services() {
   echo "Fahre herunter …"
   # Web/Worker laufen per setsid in eigenen Prozessgruppen → ganze Gruppe beenden,
   # sonst überleben die npm-Enkelprozesse (sh → tsx → node)
   [ -n "$WEB_PID" ] && { kill -- "-$WEB_PID" 2>/dev/null || kill "$WEB_PID" 2>/dev/null; } || true
   [ -n "$WORKER_PID" ] && { kill -- "-$WORKER_PID" 2>/dev/null || kill "$WORKER_PID" 2>/dev/null; } || true
+  [ -n "$HELP_PID" ] && { kill -- "-$HELP_PID" 2>/dev/null || kill "$HELP_PID" 2>/dev/null; } || true
   # Warten, bis beide sich sauber beendet haben (der Worker schließt seine
   # Queues und braucht dafür Redis) — erst DANACH Redis/Postgres stoppen
   for _ in $(seq 1 20); do
@@ -104,13 +108,17 @@ stop_services() {
 }
 trap 'trap - TERM INT; stop_services; exit 0' TERM INT
 
-# --- Worker + Web-App (eigene Prozessgruppen, s. stop_services) ---
+# --- Worker + Web-App + Help-Portal (eigene Prozessgruppen, s. stop_services) ---
 setsid npm run worker &
 WORKER_PID=$!
 setsid npm run start &
 WEB_PID=$!
+# Eigenständiges Help-Portal (Doku-Site) parallel auf Port 3001
+setsid npx tsx scripts/help-server.ts &
+HELP_PID=$!
 
 echo "smartlife Support läuft auf ${APP_URL} (Login: ${SEED_ADMIN_EMAIL:-admin@smartlife.software})"
+echo "Help-Portal (Doku) läuft auf Port ${HELP_PORT} — Site bauen: docker/build-help.sh"
 
 # Beendet sich einer der beiden Prozesse, Container mit Fehler beenden
 EXIT_CODE=0
