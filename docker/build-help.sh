@@ -23,14 +23,22 @@ fi
 
 # 1) Repo in ein beschreibbares Build-Verzeichnis kopieren (der Mount ist
 #    read-only; gulp/gatsby schreiben in ./static, ./src/pages, ./public, …).
+#    .git kommt mit: gatsby-node.js liest daraus das "Updated"-Datum jeder Seite.
 #    node_modules bleibt zwischen Läufen erhalten — nur der Repo-Inhalt wird erneuert.
 echo "Kopiere Doku-Repo nach ${BUILD_DIR} …"
 mkdir -p "$BUILD_DIR"
 find "$BUILD_DIR" -mindepth 1 -maxdepth 1 ! -name node_modules -exec rm -rf {} +
-tar -C "$DOCS_DIR" --exclude=./node_modules --exclude=./.cache --exclude=./public --exclude=./.git -cf - . \
+tar -C "$DOCS_DIR" --exclude=./node_modules --exclude=./.cache --exclude=./public -cf - . \
   | tar -C "$BUILD_DIR" -xf -
 
 cd "$BUILD_DIR"
+git config --global --add safe.directory "$BUILD_DIR" 2>/dev/null || true
+if [ ! -e .git ]; then
+  # Repo wurde ohne Git-Historie bereitgestellt (z. B. ZIP-Download):
+  # Ersatz-Historie anlegen, damit gatsby-node.js ein "Updated"-Datum findet
+  echo "Hinweis: keine Git-Historie im Doku-Repo — alle Seiten erhalten das heutige Datum."
+  git init -q . && git add -A -- docs && git -c user.email=build@local -c user.name=build commit -qm import
+fi
 
 # gatsby-node.js verweist auf "Layout.js", die Datei heißt "layout.js" —
 # auf Windows egal, auf Linux nicht

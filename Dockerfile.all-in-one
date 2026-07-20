@@ -17,7 +17,7 @@ RUN apt-get update \
        > /etc/apt/sources.list.d/pgdg.list \
     && apt-get update \
     && apt-get install -y --no-install-recommends postgresql-16 postgresql-client-16 redis-server \
-       python3 python3-opencv python3-numpy \
+       python3 python3-opencv python3-numpy git \
     && rm -rf /var/lib/apt/lists/* \
     # das vom Paket automatisch angelegte Cluster wird nicht genutzt (PGDATA liegt in /data)
     && rm -rf /var/lib/postgresql/16/main
